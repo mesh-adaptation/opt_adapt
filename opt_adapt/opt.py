@@ -2,7 +2,7 @@ import firedrake as fd
 import firedrake_adjoint as fd_adj
 import ufl
 
-from utils import pprint
+from opt_adapt.utils import pprint
 
 import numpy as np
 from time import perf_counter
