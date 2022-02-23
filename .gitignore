@@ -1,0 +1,15 @@
+.ipynb_checkpoints/
+outputs/
+opt_adapt.egg-info/
+__pycache__/
+
+*.h5
+*.jpeg
+*.jpg
+*.log
+*.msh
+*.npy
+*.pdf
+*.png
+*.pvd
+*.vtu
