@@ -1,5 +1,6 @@
 import firedrake as fd
 import firedrake_adjoint as fd_adj
+from firedrake.adjoint import get_solve_blocks
 import ufl
 
 from opt_adapt.utils import pprint
@@ -8,7 +9,7 @@ import numpy as np
 from time import perf_counter
 
 
-__all__ = ["OptimisationProgress", "identity_mesh", "minimise"]
+__all__ = ["OptimisationProgress", "identity_mesh", "get_state", "minimise"]
 
 
 class OptimisationProgress(object):
@@ -77,6 +78,18 @@ def identity_mesh(mesh, **kwargs):
     return mesh
 
 
+def get_state(adjoint=False, tape=None):
+    """
+    Extract the current state from the tape (velocity and
+    elevation).
+
+    :kwarg adjoint: If ``True``, return the corresponding
+        adjoint state variables.
+    """
+    solve_block = get_solve_blocks()[0]
+    return solve_block.adj_sol if adjoint else solve_block._outputs[0].saved_output
+
+
 def minimise(
     forward_run,
     mesh,
@@ -122,8 +135,8 @@ def minimise(
     maxiter = options.get("maxiter", 101)
     gtol = options.get("gtol", 1.0e-05)
     dtol = options.get("dtol", 1.0001)  # i.e. 0.01 % increase in QoI
-    element_rtol = options.get("element_rtol", 0.001)
-    qoi_rtol = options.get("qoi_rtol", 0.001)
+    element_rtol = options.get("element_rtol", 0.005)
+    qoi_rtol = options.get("qoi_rtol", 0.005)
     disp = options.get("disp", 0)
     target = options.get("target_base", 200.0)
     target_inc = options.get("target_inc", 200.0)
@@ -131,6 +144,7 @@ def minimise(
 
     # Enter the optimisation loop
     nc_ = mesh.num_cells()
+    adaptor = adapt_fn
     for it in range(1, maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
@@ -179,17 +193,18 @@ def minimise(
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
         # Adapt the mesh
-        if adapt_fn == identity_mesh:
-            continue
         target = min(target + target_inc, target_max)  # Ramp up the target complexity
-        mesh = adapt_fn(mesh, target=target, control=u)
+        mesh = adaptor(mesh, target=target, control=u)
         nc = mesh.num_cells()
 
         # Check for mesh convergence
-        if np.abs(nc - nc_) < element_rtol * nc_:
+        if adaptor != identity_mesh and np.abs(nc - nc_) < element_rtol * nc_:
             if disp > 1:
                 pprint("NOTE: turning adaptation off due to element_rtol convergence")
-            adapt_fn = identity_mesh
+            adaptor = identity_mesh
+            continue
+        else:
+            adaptor = adapt_fn
         nc_ = nc
 
         # Check for QoI convergence
@@ -199,7 +214,10 @@ def minimise(
             if np.abs(qoi - qoi_) < qoi_rtol * qoi_:
                 if disp > 1:
                     pprint("NOTE: turning adaptation off due to qoi_rtol convergence")
-                adapt_fn = identity_mesh
+                adaptor = identity_mesh
+                continue
+            else:
+                adaptor = adapt_fn
 
         # Clean up
         tape.clear_tape()
