@@ -50,6 +50,5 @@ np.save(
     np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
 )
 with open(f"data/uniform_{n}.log", "w+") as f:
-    f.write(f"cpu_time: {cpu_time}\n")
-    if failed:
-        f.write("(FAIL)\n")
+    note = " (FAIL)" if failed else ""
+    f.write(f"cpu_time: {cpu_time}{note}\n")

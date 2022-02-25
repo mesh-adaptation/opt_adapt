@@ -10,7 +10,7 @@ from time import perf_counter
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("--n", type=int, default=1)
+parser.add_argument("--n", type=int, default=4)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
@@ -82,6 +82,5 @@ np.save(
     np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
 )
 with open(f"data/hessian_{target:.0f}.log", "w+") as f:
-    f.write(f"cpu_time: {cpu_time}\n")
-    if failed:
-        f.write("(FAIL)\n")
+    note = " (FAIL)" if failed else ""
+    f.write(f"cpu_time: {cpu_time}{note}\n")

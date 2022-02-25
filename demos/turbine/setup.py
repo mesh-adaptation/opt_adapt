@@ -3,14 +3,15 @@ from pyroteus.metric import *
 from pyroteus.recovery import *
 from opt_adapt.opt import get_state
 import logging
+import numpy as np
 
 
 logger = logging.getLogger("thetis_output")
 logger.setLevel(ERROR)
 
 
-def initial_mesh(n=2):
-    return RectangleMesh(120 * n, 50 * n, 1200, 500)
+def initial_mesh(n=4):
+    return RectangleMesh(12 * n, 5 * n, 1200, 500)
 
 
 def initial_control(mesh):

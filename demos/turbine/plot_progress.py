@@ -7,18 +7,8 @@ from thetis import create_directory
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument(
-    "--uniform",
-    nargs="+",
-    type=int,
-    default=[],
-)
-parser.add_argument(
-    "--hessian",
-    nargs="+",
-    type=int,
-    default=[],
-)
+for method in ("uniform", "hessian", "go"):
+    parser.add_argument(f"--{method}", nargs="+", type=int, default=[])
 args = parser.parse_args()
 
 
@@ -51,18 +41,11 @@ def plot_progress(axes, method, ext, gradients=True, **kwargs):
 
 fig, axes = plt.subplots()
 i = 0
-for n in args.uniform:
-    plot_progress(axes, "uniform", n, label=f"Uniform {n}", color=f"C{i}")
-    i += 1
-for target in args.hessian:
-    plot_progress(
-        axes,
-        "hessian",
-        target,
-        label=f"Hessian-based {target}",
-        color=f"C{i}",
-    )
-    i += 1
+methods = {"uniform": args.uniform, "hessian": args.hessian, "go": args.go}
+for method, vals in methods.items():
+    for ext in vals:
+        plot_progress(axes, method, n, label=f"{method} {ext}", color=f"C{i}")
+        i += 1
 axes.set_xlabel(r"$y$-offset of second turbine ($\mathrm{m}$)")
 axes.set_ylabel(r"Power output ($\mathrm{kW}$)")
 # axes.set_xlim([0, 60])
