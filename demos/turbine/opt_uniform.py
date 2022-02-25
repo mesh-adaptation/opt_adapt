@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--maxiter", type=int, default=100)
+parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=1)
 args = parser.parse_args()
@@ -19,6 +20,7 @@ options = {
     "disp": args.disp,
     "lr": args.lr,
     "maxiter": args.maxiter,
+    "gtol": args.gtol,
     "model_options": {
         "output_directory": "outputs_uniform",
     },

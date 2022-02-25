@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
+parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=2)
 args = parser.parse_args()
@@ -21,6 +22,7 @@ target = args.target
 options = {
     "disp": args.disp,
     "lr": args.lr,
+    "gtol": args.gtol,
     "maxiter": args.maxiter,
     "target_base": 0.2 * target,
     "target_inc": 0.1 * target,
