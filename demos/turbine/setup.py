@@ -71,13 +71,15 @@ def forward_run(mesh, control=None, **model_options):
 
     # Define turbine parameters
     R = FunctionSpace(mesh, "R", 0)
+    ym = 250.0
+    sep = 60.0
     x1 = Constant(456.0)
     x2 = Constant(456.0)
     x3 = Constant(456.0)
     xc = Constant(744.0)
-    y1 = Constant(250.0)
-    y2 = Constant(330.0)
-    y3 = Constant(170.0)
+    y1 = Constant(ym)
+    y2 = Constant(ym + sep)
+    y3 = Constant(ym - sep)
     yc = Function(R).assign(control or 250.0)
     Ct = 0.8
     D = 18.0
