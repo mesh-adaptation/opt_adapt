@@ -26,13 +26,9 @@ def forward_run(mesh, control=None):
 
     # Setup bathymetry
     H = 40.0
-    h = 10.0
-    a = 60.0
     P1_2d = get_functionspace(mesh, "CG", 1)
     bathymetry = Function(P1_2d)
-    bathymetry.interpolate(
-        H + h * (exp(-(((y - 100) / a) ** 2)) + exp(-(((y - 400) / a) ** 2)))
-    )
+    bathymetry.assign(H)
 
     # Setup solver
     solver_obj = solver2d.FlowSolver2d(mesh, bathymetry)
@@ -75,9 +71,13 @@ def forward_run(mesh, control=None):
     # Define turbine parameters
     R = FunctionSpace(mesh, "R", 0)
     x1 = Constant(456.0)
-    x2 = Constant(744.0)
+    x2 = Constant(456.0)
+    x3 = Constant(456.0)
+    xc = Constant(744.0)
     y1 = Constant(250.0)
-    y2 = Function(R).assign(control or 250.0)
+    y2 = Constant(330.0)
+    y3 = Constant(170.0)
+    yc = Function(R).assign(control or 250.0)
     Ct = 0.8
     D = 18.0
     At = D**2
@@ -92,9 +92,18 @@ def forward_run(mesh, control=None):
 
     b1 = assemble(bump(x1, y1) * dx)
     b2 = assemble(bump(x2, y2) * dx)
+    b3 = assemble(bump(x3, y3) * dx)
+    bc = assemble(bump(xc, yc) * dx)
     assert b1 > 0.0, f"Invalid area for turbine 1: {b1}"
     assert b2 > 0.0, f"Invalid area for turbine 2: {b2}"
-    bumps = bump(x1, y1, scale=1 / b1) + bump(x2, y2, scale=1 / b2)
+    assert b3 > 0.0, f"Invalid area for turbine 3: {b3}"
+    assert bc > 0.0, f"Invalid area for control turbine: {bc}"
+    bumps = (
+        bump(x1, y1, scale=1 / b1)
+        + bump(x2, y2, scale=1 / b2)
+        + bump(x3, y3, scale=1 / b3)
+        + bump(xc, yc, scale=1 / bc)
+    )
 
     # Setup tidal farm
     Ct = Ct * 4.0 / (1.0 + sqrt(1.0 - Ct * At / (H * D)))  # thrust correction
@@ -115,4 +124,4 @@ def forward_run(mesh, control=None):
         -rho * 0.5 * Ct * (pi * D / 2) ** 2 / At * bumps
     )  # NOTE: negative because we want maximum
     J = assemble(coeff * dot(u, u) ** 1.5 * dx, ad_block_tag="qoi")
-    return J, y2
+    return J, yc

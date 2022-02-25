@@ -10,3 +10,6 @@ hessian:
 	python3 opt_hessian.py --target 2000
 	python3 opt_hessian.py --target 4000
 	python3 opt_hessian.py --target 8000
+
+clean:
+	rm *.log
