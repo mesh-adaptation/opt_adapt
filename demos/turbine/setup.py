@@ -123,8 +123,13 @@ def forward_run(mesh, control=None, **model_options):
 
     # Define objective function
     u, p = split(solver_obj.fields.solution_2d)
-    coeff = (
-        -rho * 0.5 * Ct * (pi * D / 2) ** 2 / At * bumps
-    )  # NOTE: negative because we want maximum
-    J = assemble(coeff * dot(u, u) ** 1.5 * dx, ad_block_tag="qoi")
+    coeff = -rho * 0.5 * Ct * (pi * D / 2) ** 2 / At * bumps
+    J_power = coeff * dot(u, u) ** 1.5 * dx
+    # NOTE: negative because we want maximum
+
+    # Add a regularisation term for constraining the control
+    alpha = Constant(100.0)
+    J_reg = alpha * (yc - ym) ** 2 * dx
+
+    J = assemble(J_power + J_reg, ad_block_tag="qoi")
     return J, yc
