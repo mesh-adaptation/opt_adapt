@@ -38,10 +38,16 @@ except Exception as exc:
     print(f"Reason: {exc}")
     failed = True
 create_directory("data")
-np.save(f"data/uniform_progress_m_{n}", np.array([m.dat.data[0] for m in op.m_progress]).flatten())
+np.save(
+    f"data/uniform_progress_m_{n}",
+    np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
+)
 np.save(f"data/uniform_progress_J_{n}", op.J_progress)
-np.save(f"data/uniform_progress_dJdm_{n}", np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten())
+np.save(
+    f"data/uniform_progress_dJdm_{n}",
+    np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
+)
 with open(f"data/uniform_{n}.log", "w+") as f:
-    f.write(f"cpu_time: {cpu_time}")
+    f.write(f"cpu_time: {cpu_time}\n")
     if failed:
-        f.write(f" (FAIL)")
+        f.write("(FAIL)\n")

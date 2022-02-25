@@ -1,4 +1,7 @@
 from thetis import *
+from pyroteus.metric import *
+from pyroteus.recovery import *
+from opt_adapt.opt import get_state
 import logging
 
 
@@ -133,3 +136,31 @@ def forward_run(mesh, control=None, **model_options):
 
     J = assemble(J_power + J_reg, ad_block_tag="qoi")
     return J, yc
+
+
+def hessian(mesh, **kwargs):
+    """
+    Recover the Hessian of each component of the state and
+    intersect them.
+
+    :kwarg adjoint: If ``True``, recover Hessians from the
+    adjoint state, rather than the forward one.
+    """
+    uv, eta = get_state(**kwargs).split()
+    V = FunctionSpace(mesh, uv.ufl_element().family(), uv.ufl_element().degree())
+    u = interpolate(uv[0], V)
+    v = interpolate(uv[1], V)
+
+    def hessian_component(f):
+        """
+        Recover the Hessian of a single component and
+        scale it so that all of the components are of
+        consistent metric complexity.
+        """
+        return space_normalise(hessian_metric(recover_hessian(f)), 1000.0, "inf")
+
+    metric = metric_intersection(
+        hessian_component(u), hessian_component(v), hessian_component(eta)
+    )
+    print_output("Hessian intersection complete.")
+    return metric
