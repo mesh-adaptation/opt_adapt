@@ -3,7 +3,6 @@ from pyroteus.metric import *
 from pyroteus.recovery import *
 from opt_adapt.opt import get_state
 import logging
-import numpy as np
 
 
 logger = logging.getLogger("thetis_output")

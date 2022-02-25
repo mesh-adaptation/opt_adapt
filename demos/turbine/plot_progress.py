@@ -44,11 +44,10 @@ i = 0
 methods = {"uniform": args.uniform, "hessian": args.hessian, "go": args.go}
 for method, vals in methods.items():
     for ext in vals:
-        plot_progress(axes, method, n, label=f"{method} {ext}", color=f"C{i}")
+        plot_progress(axes, method, ext, label=f"{method} {ext}", color=f"C{i}")
         i += 1
 axes.set_xlabel(r"$y$-offset of second turbine ($\mathrm{m}$)")
 axes.set_ylabel(r"Power output ($\mathrm{kW}$)")
-# axes.set_xlim([0, 60])
 axes.grid(True, which="both")
 axes.legend()
 plt.tight_layout()
