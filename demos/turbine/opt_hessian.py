@@ -87,10 +87,11 @@ except Exception as exc:
     print(f"Hessian-based optimisation failed after {cpu_time:.2f}s")
     print(f"Reason: {exc}")
     failed = True
-np.save(f"hessian_progress_m_{target:.0f}", np.array([m.dat.data[0] for m in op.m_progress]).flatten())
-np.save(f"hessian_progress_J_{target:.0f}", op.J_progress)
-np.save(f"hessian_progress_dJdm_{target:.0f}", np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten())
-with open(f"hessian_{target:.0f}.log", "w+") as f:
+create_directory("data")
+np.save(f"data/hessian_progress_m_{target:.0f}", np.array([m.dat.data[0] for m in op.m_progress]).flatten())
+np.save(f"data/hessian_progress_J_{target:.0f}", op.J_progress)
+np.save(f"data/hessian_progress_dJdm_{target:.0f}", np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten())
+with open(f"data/hessian_{target:.0f}.log", "w+") as f:
     f.write(f"cpu_time: {cpu_time}")
     if failed:
         f.write(f" (FAIL)")

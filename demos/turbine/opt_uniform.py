@@ -34,10 +34,11 @@ except Exception as exc:
     print(f"Uniform optimisation failed after {cpu_time:.2f}s")
     print(f"Reason: {exc}")
     failed = True
-np.save(f"uniform_progress_m_{n}", np.array([m.dat.data[0] for m in op.m_progress]).flatten())
-np.save(f"uniform_progress_J_{n}", op.J_progress)
-np.save(f"uniform_progress_dJdm_{n}", np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten())
-with open(f"uniform_{n}.log", "w+") as f:
+create_directory("data")
+np.save(f"data/uniform_progress_m_{n}", np.array([m.dat.data[0] for m in op.m_progress]).flatten())
+np.save(f"data/uniform_progress_J_{n}", op.J_progress)
+np.save(f"data/uniform_progress_dJdm_{n}", np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten())
+with open(f"data/uniform_{n}.log", "w+") as f:
     f.write(f"cpu_time: {cpu_time}")
     if failed:
         f.write(f" (FAIL)")
