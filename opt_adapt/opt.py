@@ -136,7 +136,7 @@ def minimise(
     options.setdefault("transfer_fn", fd.project)  # mesh-to-mesh interpolation method
     maxiter = options.get("maxiter", 101)
     gtol = options.get("gtol", 1.0e-05)
-    dtol = options.get("dtol", 1.0001)  # i.e. 0.01 % increase in QoI
+    dtol = options.get("dtol", 1.0001)  # i.e. 0.01% increase in QoI
     element_rtol = options.get("element_rtol", 0.005)
     qoi_rtol = options.get("qoi_rtol", 0.005)
     disp = options.get("disp", 0)
@@ -147,6 +147,7 @@ def minimise(
     # Enter the optimisation loop
     nc_ = mesh.num_cells()
     adaptor = adapt_fn
+    mesh_conv_it = []
     for it in range(1, maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
@@ -201,6 +202,11 @@ def minimise(
 
         # Check for mesh convergence
         if adaptor != identity_mesh and np.abs(nc - nc_) < element_rtol * nc_:
+            conv = np.array([op.J_progress[i] for i in mesh_conv_it])
+            if (np.abs(qoi - conv) < qoi_rtol * np.abs(conv)).any():
+                pprint(term_msg + "qoi_rtol convergence")
+                break
+            mesh_conv_it.append(it)
             if disp > 1:
                 pprint("NOTE: turning adaptation off due to element_rtol convergence")
             adaptor = identity_mesh
@@ -213,7 +219,13 @@ def minimise(
         if it > 1:
             qoi = op.J_progress[-1]
             qoi_ = op.J_progress[-2]
-            if np.abs(qoi - qoi_) < qoi_rtol * qoi_:
+            if np.abs(qoi - qoi_) < qoi_rtol * np.abs(qoi_):
+                if adaptor != identity_mesh:
+                    conv = np.array([op.J_progress[i] for i in mesh_conv_it])
+                    if (np.abs(qoi - conv) < qoi_rtol * np.abs(conv)).any():
+                        pprint(term_msg + "qoi_rtol convergence")
+                        break
+                mesh_conv_it.append(it)
                 if disp > 1:
                     pprint("NOTE: turning adaptation off due to qoi_rtol convergence")
                 adaptor = identity_mesh
