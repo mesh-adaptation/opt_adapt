@@ -131,8 +131,13 @@ def forward_run(mesh, control=None, **model_options):
     # NOTE: negative because we want maximum
 
     # Add a regularisation term for constraining the control
-    alpha = Constant(100.0)
-    J_reg = alpha * (yc - ym) ** 2 * dx
+    area = assemble(Constant(1.0) * dx(domain=mesh))
+    alpha = 1.0 / area
+    J_reg = (
+        alpha
+        * conditional(yc < y2, (yc - y2) ** 2, conditional(yc > y3, (yc - y3) ** 2, 0))
+        * dx
+    )
 
     J = assemble(J_power + J_reg, ad_block_tag="qoi")
     return J, yc
