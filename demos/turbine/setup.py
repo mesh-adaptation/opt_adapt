@@ -15,7 +15,7 @@ def initial_control(mesh):
     return Function(R).assign(250.0)
 
 
-def forward_run(mesh, control=None):
+def forward_run(mesh, control=None, **model_options):
     """
     Solve the shallow water flow-past-a-turbine problem on a given mesh.
 
@@ -54,6 +54,7 @@ def forward_run(mesh, control=None):
     options.use_lax_friedrichs_velocity = True
     options.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
     options.use_grad_depth_viscosity_term = False
+    options.update(model_options)
     solver_obj.create_equations()
 
     # Setup boundary conditions

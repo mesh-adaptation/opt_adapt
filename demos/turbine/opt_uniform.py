@@ -19,6 +19,9 @@ options = {
     "disp": args.disp,
     "lr": args.lr,
     "maxiter": args.maxiter,
+    "model_options": {
+        "output_directory": "outputs_uniform",
+    },
 }
 
 mesh = initial_mesh(n=n)

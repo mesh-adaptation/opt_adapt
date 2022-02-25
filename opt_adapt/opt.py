@@ -40,9 +40,10 @@ def _gradient_descent(it, forward_run, m, u, u_, dJ_, options, Rspace=False):
     :kwarg Rspace: is the prognostic function
         space of type 'Real'?
     """
+    model_options = options.get("model_options", {})
 
     # Annotate the tape and compute the gradient
-    J, u = forward_run(m, u)
+    J, u = forward_run(m, u, **model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     yield J, u.copy(deepcopy=True), dJ.copy(deepcopy=True)
 
@@ -129,7 +130,8 @@ def minimise(
     Rspace = u.ufl_element().family() == "Real"
     dJ_init = None
 
-    # Process parameters
+    # Process parameters  # TODO: Create a separate class for these
+    options.setdefault("model_options", {})
     options.setdefault("lr", 0.001)
     options.setdefault("transfer_fn", fd.project)  # mesh-to-mesh interpolation method
     maxiter = options.get("maxiter", 101)

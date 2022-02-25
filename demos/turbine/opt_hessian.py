@@ -27,6 +27,9 @@ options = {
     "target_base": 0.2*target,
     "target_inc": 0.1*target,
     "target_max": target,
+    "model_options": {
+        "output_directory": "outputs_hessian",
+    },
 }
 
 
