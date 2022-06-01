@@ -1,4 +1,4 @@
-from thetis import create_directory, print_output
+from thetis import create_directory, print_output, File
 from firedrake import *
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
@@ -16,7 +16,7 @@ from time import perf_counter
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("demo", type=str, choices=["turbine"])
+parser.add_argument("demo", type=str, choices=["turbine", "point_discharge2d"])
 parser.add_argument("--n", type=int, default=4)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
@@ -28,7 +28,8 @@ demo = args.demo
 n = args.n
 target = args.target
 model_options = {
-    "output_directory": f"{demo}/outputs_go",
+    "no_exports": True,
+    "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
 }
 options = {
     "disp": args.disp,
@@ -65,7 +66,9 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     # TODO: avoid forward solve
     ref_tape = Tape()
     set_working_tape(ref_tape)
-    J_plus, u_plus = setup.forward_run(mh[1], control=control, **model_options)
+    opts = model_options.copy()
+    opts.pop("outfile")
+    J_plus, u_plus = setup.forward_run(mh[1], control=control, **opts)
     ReducedFunctional(J_plus, Control(u_plus)).derivative()
     solve_block = get_solve_blocks()[0]
     q_plus = get_state(adjoint=False)
@@ -103,7 +106,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 try:
-    y2_opt = minimise(
+    m_opt = minimise(
         setup.forward_run,
         mesh,
         setup.initial_control,

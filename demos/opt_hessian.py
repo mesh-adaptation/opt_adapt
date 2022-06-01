@@ -1,4 +1,4 @@
-from thetis import create_directory, print_output
+from thetis import create_directory, print_output, File
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
 from pyroteus.metric import space_normalise, enforce_element_constraints
@@ -12,7 +12,7 @@ from time import perf_counter
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("demo", type=str, choices=["turbine"])
+parser.add_argument("demo", type=str, choices=["turbine", "point_discharge2d"])
 parser.add_argument("--n", type=int, default=4)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
@@ -32,7 +32,8 @@ options = {
     "target_inc": 0.1 * target,
     "target_max": target,
     "model_options": {
-        "output_directory": f"{demo}/outputs_hessian",
+        "no_exports": True,
+        "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
     },
 }
 
@@ -61,7 +62,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 try:
-    y2_opt = minimise(
+    m_opt = minimise(
         setup.forward_run,
         mesh,
         setup.initial_control,
