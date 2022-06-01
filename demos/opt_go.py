@@ -1,4 +1,5 @@
-from setup import *
+from thetis import create_directory, print_output
+from firedrake import *
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
 from firedrake.adjoint import get_solve_blocks
@@ -7,6 +8,7 @@ from pyroteus.metric import *
 from pyroteus.recovery import *
 from opt_adapt.opt import *
 import argparse
+import importlib
 import numpy as np
 from time import perf_counter
 
@@ -14,6 +16,7 @@ from time import perf_counter
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
+parser.add_argument("demo", type=str, choices=["turbine"])
 parser.add_argument("--n", type=int, default=4)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
@@ -21,10 +24,11 @@ parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=2)
 args = parser.parse_args()
+demo = args.demo
 n = args.n
 target = args.target
 model_options = {
-    "output_directory": "outputs_go",
+    "output_directory": f"{demo}/outputs_go",
 }
 options = {
     "disp": args.disp,
@@ -61,7 +65,7 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     # TODO: avoid forward solve
     ref_tape = Tape()
     set_working_tape(ref_tape)
-    J_plus, u_plus = forward_run(mh[1], control=control, **model_options)
+    J_plus, u_plus = setup.forward_run(mh[1], control=control, **model_options)
     ReducedFunctional(J_plus, Control(u_plus)).derivative()
     solve_block = get_solve_blocks()[0]
     q_plus = get_state(adjoint=False)
@@ -81,10 +85,11 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     # Construct an anisotropic metric
     metric = anisotropic_metric(
         indicator,
-        hessian=hessian(mesh),
+        hessian=setup.hessian(mesh),
         target_complexity=target,
         convergence_rate=alpha,
     )
+    space_normalise(metric, target, "inf")
     enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
     print_output("Metric construction complete.")
     newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
@@ -92,13 +97,19 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     return newmesh
 
 
-mesh = initial_mesh(n=n)
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 try:
     y2_opt = minimise(
-        forward_run, mesh, initial_control, adapt_fn=adapt_go, options=options, op=op
+        setup.forward_run,
+        mesh,
+        setup.initial_control,
+        adapt_fn=adapt_go,
+        options=options,
+        op=op
     )
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Goal-oriented optimisation completed in {cpu_time:.2f}s")
@@ -107,16 +118,16 @@ except Exception as exc:
     print(f"Goal-oriented optimisation failed after {cpu_time:.2f}s")
     print(f"Reason: {exc}")
     failed = True
-create_directory("data")
+create_directory(f"{demo}/data")
 np.save(
-    f"data/go_progress_m_{target:.0f}",
+    f"{demo}/data/go_progress_m_{target:.0f}",
     np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
 )
-np.save(f"data/go_progress_J_{target:.0f}", op.J_progress)
+np.save(f"{demo}/data/go_progress_J_{target:.0f}", op.J_progress)
 np.save(
-    f"data/go_progress_dJdm_{target:.0f}",
+    f"{demo}/data/go_progress_dJdm_{target:.0f}",
     np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
 )
-with open(f"data/go_{target:.0f}.log", "w+") as f:
+with open(f"{demo}/data/go_{target:.0f}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
