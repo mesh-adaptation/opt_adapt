@@ -1,4 +1,4 @@
-from thetis import create_directory
+from thetis import create_directory, File
 from opt_adapt.opt import OptimisationProgress, minimise
 import argparse
 import importlib
@@ -9,7 +9,7 @@ from time import perf_counter
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("demo", type=str, choices=["turbine"])
+parser.add_argument("demo", type=str, choices=["turbine", "point_discharge2d"])
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
@@ -24,7 +24,8 @@ options = {
     "maxiter": args.maxiter,
     "gtol": args.gtol,
     "model_options": {
-        "output_directory": f"{demo}/outputs_uniform",
+        "no_exports": True,
+        "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
     },
 }
 
@@ -34,7 +35,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 try:
-    y2_opt = minimise(setup.forward_run, mesh, setup.initial_control, options=options, op=op)
+    m_opt = minimise(setup.forward_run, mesh, setup.initial_control, options=options, op=op)
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 except Exception as exc:
