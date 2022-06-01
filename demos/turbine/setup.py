@@ -18,7 +18,7 @@ def initial_control(mesh):
     return Function(R).assign(250.0)
 
 
-def forward_run(mesh, control=None, **model_options):
+def forward_run(mesh, control=None, outfile=None, **model_options):
     """
     Solve the shallow water flow-past-a-turbine problem on a given mesh.
 
@@ -123,9 +123,12 @@ def forward_run(mesh, control=None, **model_options):
     # Apply initial conditions and solve
     solver_obj.assign_initial_conditions(uv=u_in)
     solver_obj.iterate()
+    if outfile is not None:
+        u, eta = solver_obj.fields.solution_2d.split()
+        outfile.write(u, eta)
 
     # Define objective function
-    u, p = split(solver_obj.fields.solution_2d)
+    u, eta = split(solver_obj.fields.solution_2d)
     coeff = -rho * 0.5 * Ct * (pi * D / 2) ** 2 / At * bumps
     J_power = coeff * dot(u, u) ** 1.5 * dx
     # NOTE: negative because we want maximum
