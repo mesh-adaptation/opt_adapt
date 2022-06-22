@@ -98,7 +98,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     c_ana = 0.5 * q / (pi * D) * exp(Pe * (x - xs)) * bessk0(Pe * d)
 
     # Define quantity of interest
-    kernel = conditional((x - xs) ** 2 + (y - ys) ** 2 > r ** 2, 1, 0)
+    kernel = conditional(r2 > r ** 2, 1, 0)
     area = assemble(Constant(1.0, domain=mesh) * dx)
     J = assemble(kernel * (c - c_ana) ** 2 / area * dx, ad_block_tag="qoi")
     return J, r
