@@ -6,13 +6,16 @@ from opt_adapt.opt import *
 import argparse
 import importlib
 import numpy as np
+import os
 from time import perf_counter
 
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("demo", type=str, choices=["turbine", "point_discharge2d"])
+pwd = os.path.abspath(os.path.dirname(__file__))
+choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
+parser.add_argument("demo", type=str, choices=choices)
 parser.add_argument("--n", type=int, default=4)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
