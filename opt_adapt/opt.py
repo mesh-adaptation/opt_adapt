@@ -164,7 +164,7 @@ def minimise(
             g = out1[2].dat.data[0] if Rspace else fd.norm(out1[2])
             msgs = [f"{it:3d}:  J = {out1[0]:9.4e}"]
             if Rspace:
-                msgs.append(f"m = {out1[1].dat.data[0]:.2f}")
+                msgs.append(f"m = {out1[1].dat.data[0]:9.4e}")
             if Rspace:
                 msgs.append(f"dJdm = {g:11.4e}")
             else:
