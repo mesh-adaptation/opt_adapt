@@ -203,6 +203,7 @@ def minimise(
         # Check for mesh convergence
         if adaptor != identity_mesh and np.abs(nc - nc_) < element_rtol * nc_:
             conv = np.array([op.J_progress[i] for i in mesh_conv_it])
+            qoi = op.J_progress[-1]
             if (np.abs(qoi - conv) < qoi_rtol * np.abs(conv)).any():
                 pprint(term_msg + "qoi_rtol convergence")
                 break
