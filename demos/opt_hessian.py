@@ -6,14 +6,17 @@ from opt_adapt.opt import *
 import argparse
 import importlib
 import numpy as np
+import os
 from time import perf_counter
 
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("demo", type=str, choices=["turbine", "point_discharge2d"])
-parser.add_argument("--n", type=int, default=4)
+pwd = os.path.abspath(os.path.dirname(__file__))
+choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
+parser.add_argument("demo", type=str, choices=choices)
+parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
@@ -50,9 +53,11 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     """
     metric = space_normalise(setup.hessian(mesh), target, norm_order)
     enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
-    print_output("Metric construction complete.")
+    if args.disp > 2:
+        print_output("Metric construction complete.")
     newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
-    print_output("Mesh adaptation complete.")
+    if args.disp > 2:
+        print_output("Mesh adaptation complete.")
     return newmesh
 
 

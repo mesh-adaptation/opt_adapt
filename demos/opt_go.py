@@ -10,14 +10,17 @@ from opt_adapt.opt import *
 import argparse
 import importlib
 import numpy as np
+import os
 from time import perf_counter
 
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("demo", type=str, choices=["turbine", "point_discharge2d"])
-parser.add_argument("--n", type=int, default=4)
+pwd = os.path.abspath(os.path.dirname(__file__))
+choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
+parser.add_argument("demo", type=str, choices=choices)
+parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
@@ -60,7 +63,8 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     V_plus = FunctionSpace(mh[1], q_star.ufl_element())
     q_star_plg = Function(V_plus)
     tm.prolong(q_star, q_star_plg)
-    print_output("Base fields prolonged.")
+    if args.disp > 2:
+        print_output("Base fields prolonged.")
 
     # Solve the forward and adjoint problem in the enriched space
     # TODO: avoid forward solve
@@ -76,14 +80,16 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     F_plus = replace(solve_block.lhs - solve_block.rhs, {TrialFunction(V_plus): q_plus})
     ref_tape.clear_tape()
     set_working_tape(tape)
-    print_output("Error estimation complete.")
+    if args.disp > 2:
+        print_output("Error estimation complete.")
 
     # Extract an error indicator and project it back down
     q_star_plus -= q_star_plg
     indicator_plus = get_dwr_indicator(F_plus, q_star_plus)
     indicator = project(indicator_plus, FunctionSpace(mesh, "DG", 0))
     indicator.interpolate(abs(indicator))
-    print_output("Error estimator projected.")
+    if args.disp > 2:
+        print_output("Error estimator projected.")
 
     # Construct an anisotropic metric
     metric = anisotropic_metric(
@@ -94,9 +100,11 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     )
     space_normalise(metric, target, "inf")
     enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
-    print_output("Metric construction complete.")
+    if args.disp > 2:
+        print_output("Metric construction complete.")
     newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
-    print_output("Mesh adaptation complete.")
+    if args.disp > 2:
+        print_output("Mesh adaptation complete.")
     return newmesh
 
 

@@ -164,7 +164,7 @@ def minimise(
             g = out1[2].dat.data[0] if Rspace else fd.norm(out1[2])
             msgs = [f"{it:3d}:  J = {out1[0]:9.4e}"]
             if Rspace:
-                msgs.append(f"m = {out1[1].dat.data[0]:.2f}")
+                msgs.append(f"m = {out1[1].dat.data[0]:9.4e}")
             if Rspace:
                 msgs.append(f"dJdm = {g:11.4e}")
             else:
@@ -203,6 +203,7 @@ def minimise(
         # Check for mesh convergence
         if adaptor != identity_mesh and np.abs(nc - nc_) < element_rtol * nc_:
             conv = np.array([op.J_progress[i] for i in mesh_conv_it])
+            qoi = op.J_progress[-1]
             if (np.abs(qoi - conv) < qoi_rtol * np.abs(conv)).any():
                 pprint(term_msg + "qoi_rtol convergence")
                 break

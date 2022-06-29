@@ -1,7 +1,8 @@
 """
 Problem specification for a simple
-advection-diffusion test case with a
-point source, from [Riadh et al. 2014].
+3D advection-diffusion test case with
+a point source. Extended from the 2D
+test case in [Riadh et al. 2014].
 
 The 0D control variable is the radius used
 in the Gaussian approxmiation of the point
@@ -21,22 +22,22 @@ since it blows up.
     p. 134 (2014).
 """
 from firedrake import *
-from pyroteus.math import bessk0
 from pyroteus.metric import *
 from pyroteus.recovery import *
 from opt_adapt.opt import get_state
 
 
-dx = dx(degree=12)  # Use a high quadrature degree
+dx = dx(degree=3)
+# dx = dx(degree=12)  # TODO: Use a high quadrature degree
 
 
 def initial_mesh(n=1):
-    return RectangleMesh(100 * n, 20 * n, 50, 10)
+    return BoxMesh(100 * n, 20 * n, 20 * n, 50, 10, 10)
 
 
 def initial_control(mesh):
     R = FunctionSpace(mesh, "R", 0)
-    return Function(R).assign(0.1)
+    return Function(R).assign(0.2)
 
 
 def forward_run(mesh, control=None, outfile=None, **model_options):
@@ -47,21 +48,21 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     Optionally, pass an initial value for the control variable
     (radius used in the source model).
     """
-    x, y = SpatialCoordinate(mesh)
+    x, y, z = SpatialCoordinate(mesh)
     P1 = FunctionSpace(mesh, "CG", 1)
     c = Function(P1, name="Tracer concentration")
 
     # Define source term
     R = FunctionSpace(mesh, "R", 0)
     r = Function(R).assign(control or 0.1)
-    scale, xs, ys = Constant(100.0), Constant(2.0), Constant(5.0)
-    r2 = (x - xs) ** 2 + (y - ys) ** 2
+    scale, xs, ys, zs = Constant(100.0), Constant(2.0), Constant(5.0), Constant(5.0)
+    r2 = (x - xs) ** 2 + (y - ys) ** 2 + (z - zs) ** 2
     d = max_value(sqrt(r2), r)
     source = scale * exp(-r2 / r ** 2)
 
     # Define physical parameters
     D = Constant(0.1)
-    u = Constant(as_vector([1, 0]))
+    u = Constant(as_vector([1, 0, 0]))
 
     # Define stabilisation term
     h = CellSize(mesh)
@@ -94,7 +95,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     # Define analytical solution
     Pe = 0.5 * u[0] / D
     q = 1.0
-    c_ana = 0.5 * q / (pi * D) * exp(Pe * (x - xs)) * bessk0(Pe * d)
+    c_ana = q / (8 * pi ** 2 * d * D) * exp(Pe * (x - xs)) * exp(-Pe * d)
 
     # Define quantity of interest
     kernel = conditional(r2 > r ** 2, 1, 0)
