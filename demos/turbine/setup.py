@@ -170,5 +170,4 @@ def hessian(mesh, **kwargs):
     metric = metric_intersection(
         hessian_component(u), hessian_component(v), hessian_component(eta)
     )
-    print_output("Hessian intersection complete.")
     return metric

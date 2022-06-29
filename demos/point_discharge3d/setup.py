@@ -22,7 +22,6 @@ since it blows up.
     p. 134 (2014).
 """
 from firedrake import *
-from thetis import print_output
 from pyroteus.metric import *
 from pyroteus.recovery import *
 from opt_adapt.opt import get_state
@@ -116,5 +115,4 @@ def hessian(mesh, **kwargs):
     c = get_state(**kwargs)
     H = hessian_metric(recover_hessian(c))
     M = space_normalise(H, 1000.0, "inf")
-    print_output("Hessian recovery complete.")
     return M
