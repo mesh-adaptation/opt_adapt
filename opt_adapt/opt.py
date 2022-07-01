@@ -45,7 +45,7 @@ def compute_full_hessian(J, u):
         raise NotImplementedError("Full Hessian only supported for R-space")
 
 
-def _gradient_descent(it, forward_run, m, u, u_, dJ_, options, Rspace=False):
+def _gradient_descent(it, forward_run, m, options, u, u_, dJ_, Rspace=False):
     """
     Take one gradient descent iteration.
 
@@ -54,11 +54,11 @@ def _gradient_descent(it, forward_run, m, u, u_, dJ_, options, Rspace=False):
         implements the forward model and
         computes the objective functional
     :arg m: the current mesh
+    :arg options: a dictionary of parameters for the
+        optimisation and adaptation routines
     :arg u: the current control value
     :arg u_: the previous control value
     :arg dJ_: the previous gradient value
-    :arg options: a dictionary of parameters for the
-        optimisation and adaptation routines
     :kwarg Rspace: is the prognostic function
         space of type 'Real'?
     """
@@ -67,7 +67,7 @@ def _gradient_descent(it, forward_run, m, u, u_, dJ_, options, Rspace=False):
     # Annotate the tape and compute the gradient
     J, u = forward_run(m, u, **model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
-    yield J, u.copy(deepcopy=True), dJ.copy(deepcopy=True)
+    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
     # Choose step length
     if u_ is None or dJ_ is None:
@@ -85,11 +85,11 @@ def _gradient_descent(it, forward_run, m, u, u_, dJ_, options, Rspace=False):
 
     # Take a step downhill
     u -= lr * dJ
-    yield lr, u, u_, dJ_
+    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
 
 
 _implemented_methods = {
-    "gradient_descent": _gradient_descent,
+    "gradient_descent": {"func": _gradient_descent, "order": 1},
 }
 
 
@@ -142,14 +142,14 @@ def minimise(
         instance
     """
     try:
-        step = _implemented_methods[method]
+        step, order = _implemented_methods[method].values()
     except KeyError:
         raise ValueError(f"Method '{method}' not recognised")
     op = op or OptimisationProgress()
     tape = fd_adj.get_working_tape()
     tape.clear_tape()
-    u = initial_control_fn(mesh)
-    Rspace = u.ufl_element().family() == "Real"
+    u_plus = initial_control_fn(mesh)
+    Rspace = u_plus.ufl_element().family() == "Real"
     dJ_init = None
 
     # Process parameters  # TODO: Create a separate class for these
@@ -174,19 +174,24 @@ def minimise(
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
         dJ_ = None if it == 1 else op.dJdm_progress[-1]
+        if order == 1:
+            args = (u_plus, u_, dJ_)
+        else:
+            raise NotImplementedError(f"Only order 1 methods are supported, not {order}")
 
         # Take a step
         cpu_timestamp = perf_counter()
-        out1, out2 = tuple(
-            step(it, forward_run, mesh, u, u_, dJ_, options, Rspace=Rspace)
-        )
-        lr, u, u_, dJ_ = out2
+        out = {}
+        for o in step(it, forward_run, mesh, options, *args, Rspace=Rspace):
+            out.update(o)
+        J, u, dJ = out["J"], out["u"], out["dJ"]
+        lr, u_plus, u_, dJ_ = out["lr"], out["u+"], out["u-"], out["dJ-"]
         if disp > 0:
             t = perf_counter() - cpu_timestamp
-            g = out1[2].dat.data[0] if Rspace else fd.norm(out1[2])
-            msgs = [f"{it:3d}:  J = {out1[0]:9.4e}"]
+            g = dJ.dat.data[0] if Rspace else fd.norm(dJ)
+            msgs = [f"{it:3d}:  J = {J:9.4e}"]
             if Rspace:
-                msgs.append(f"m = {out1[1].dat.data[0]:9.4e}")
+                msgs.append(f"m = {u_plus.dat.data[0]:9.4e}")
             if Rspace:
                 msgs.append(f"dJdm = {g:11.4e}")
             else:
@@ -197,18 +202,18 @@ def minimise(
             pprint(",  ".join(msgs))
 
         # Stash progress
-        op.J_progress.append(out1[0])
-        op.m_progress.append(out1[1])
-        op.dJdm_progress.append(out1[2])
+        op.J_progress.append(J)
+        op.m_progress.append(u)
+        op.dJdm_progress.append(dJ)
 
         # Check for QoI divergence
-        if it > 1 and np.abs(op.J_progress[-1] / np.min(op.J_progress)) > dtol:
+        if it > 1 and np.abs(J / np.min(op.J_progress)) > dtol:
             raise fd.ConvergenceError(term_msg + "dtol divergence")
 
         # Check for gradient convergence
         if it == 1:
-            dJ_init = fd.norm(op.dJdm_progress[-1])
-        elif fd.norm(op.dJdm_progress[-1]) / dJ_init < gtol:
+            dJ_init = fd.norm(dJ)
+        elif fd.norm(dJ) / dJ_init < gtol:
             if disp > 0:
                 pprint(term_msg + "gtol convergence")
             break
@@ -219,14 +224,13 @@ def minimise(
 
         # Adapt the mesh
         target = min(target + target_inc, target_max)  # Ramp up the target complexity
-        mesh = adaptor(mesh, target=target, control=u)
+        mesh = adaptor(mesh, target=target, control=u_plus)
         nc = mesh.num_cells()
 
         # Check for mesh convergence
         if adaptor != identity_mesh and np.abs(nc - nc_) < element_rtol * nc_:
             conv = np.array([op.J_progress[i] for i in mesh_conv_it])
-            qoi = op.J_progress[-1]
-            if (np.abs(qoi - conv) < qoi_rtol * np.abs(conv)).any():
+            if (np.abs(J - conv) < qoi_rtol * np.abs(conv)).any():
                 pprint(term_msg + "qoi_rtol convergence")
                 break
             mesh_conv_it.append(it)
@@ -240,12 +244,11 @@ def minimise(
 
         # Check for QoI convergence
         if it > 1:
-            qoi = op.J_progress[-1]
-            qoi_ = op.J_progress[-2]
-            if np.abs(qoi - qoi_) < qoi_rtol * np.abs(qoi_):
+            J_ = op.J_progress[-2]
+            if np.abs(J - J_) < qoi_rtol * np.abs(J_):
                 if adaptor != identity_mesh:
                     conv = np.array([op.J_progress[i] for i in mesh_conv_it])
-                    if (np.abs(qoi - conv) < qoi_rtol * np.abs(conv)).any():
+                    if (np.abs(J - conv) < qoi_rtol * np.abs(conv)).any():
                         pprint(term_msg + "qoi_rtol convergence")
                         break
                 mesh_conv_it.append(it)
@@ -258,4 +261,4 @@ def minimise(
 
         # Clean up
         tape.clear_tape()
-    return u
+    return u_plus
