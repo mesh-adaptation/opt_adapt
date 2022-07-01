@@ -12,15 +12,16 @@ from time import perf_counter
 __all__ = ["OptimisationProgress", "identity_mesh", "get_state", "minimise"]
 
 
-class OptimisationProgress(object):
+class OptimisationProgress:
     """
     Class for stashing progress of the optimisation
     routine.
     """
 
-    J_progress = []
-    m_progress = []
-    dJdm_progress = []
+    def __init__(self):
+        self.J_progress = []
+        self.m_progress = []
+        self.dJdm_progress = []
 
 
 def compute_full_hessian(J, u):
