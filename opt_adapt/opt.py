@@ -23,6 +23,28 @@ class OptimisationProgress(object):
     dJdm_progress = []
 
 
+def compute_full_hessian(J, u):
+    """
+    Compute the full Hessian of a functional
+    w.r.t. a control.
+
+    :arg J: the functional
+    :arg u: the :class:`Control`
+    """
+    if not isinstance(u, fd_adj.Control):
+        raise ValueError(f"Second argument should be a Control, not {type(u)}")
+    Jhat = fd_adj.ReducedFunctional(J, u)
+    fs = u.data().function_space()
+    Rspace = fs.ufl_element().family() == "Real"
+    if u.block_variable.adj_value is None:
+        Jhat.derivative()
+    if Rspace:
+        h = fd.Function(fs).assign(1.0)
+        return Jhat.hessian(h)
+    else:
+        raise NotImplementedError("Full Hessian only supported for R-space")
+
+
 def _gradient_descent(it, forward_run, m, u, u_, dJ_, options, Rspace=False):
     """
     Take one gradient descent iteration.
