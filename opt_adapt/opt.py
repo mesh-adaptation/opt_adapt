@@ -9,7 +9,7 @@ import numpy as np
 from time import perf_counter
 
 
-__all__ = ["OptimisationProgress", "identity_mesh", "get_state", "minimise"]
+__all__ = ["OptimisationProgress", "OptAdaptParameters", "identity_mesh", "get_state", "minimise"]
 
 
 class OptimisationProgress:
@@ -22,6 +22,35 @@ class OptimisationProgress:
         self.J_progress = []
         self.m_progress = []
         self.dJdm_progress = []
+
+
+class OptAdaptParameters:
+    """
+    Class for holding parameters associated with the
+    combined optimisation-adaptation routine.
+    """
+
+    def __init__(self, options={}):
+        self.model_options = {}
+        self.disp = 0
+        self.lr = 0.001  # Step length / learning rate
+        self.transfer_fn = fd.project  # Mesh-to-mesh interpolation method
+
+        self.maxiter = 101  # Maximum iteration count
+        self.gtol = 1.0e-05  # Gradient relative tolerance
+        self.dtol = 1.0001  # Divergence tolerance i.e. 0.01% increase
+        self.element_rtol = 0.005  # Element count relative tolerance
+        self.qoi_rtol = 0.005  # QoI relative tolerance
+
+        self.target_base = 200.0  # Base target metric complexity
+        self.target_inc = 200.0  # Increment for target metric complexity
+        self.target_max = 1000.0  # Eventual target metric complexity
+
+        # Apply user-specified values
+        for key, value in options.items():
+            if not hasattr(self, key):
+                raise ValueError(f"Option {key} not recognised")
+            self.__setattr__(key, value)
 
 
 def compute_full_hessian(J, u):
