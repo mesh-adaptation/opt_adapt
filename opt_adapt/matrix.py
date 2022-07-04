@@ -126,13 +126,18 @@ def compute_full_hessian(J, u):
         raise ValueError(f"Second argument should be a Control, not {type(u)}")
     Jhat = fd_adj.ReducedFunctional(J, u)
     fs = u.data().function_space()
-    H = Matrix(fs)
-    Rspace = fs.ufl_element().family() == "Real"
+    H = Matrix(fs).set(0.0)
+    h = fd.Function(fs)
+    tmp = Matrix(fs)
+
+    # Compute gradient, if required
     if u.block_variable.adj_value is None:
         Jhat.derivative()
-    if Rspace:
-        h = fd.Function(fs).assign(1.0)
-        H.set(Jhat.hessian(h).dat.data)
-    else:
-        raise NotImplementedError("Full Hessian only supported for R-space")
+
+    # Compute the Hessian by propagating unit vectors
+    for i in range(H.n):
+        h.dat.data[i] = 1.0
+        tmp.set(Jhat.hessian(h).dat.data)
+        H.add(tmp)
+        h.dat.data[i] = 0.0
     return H
