@@ -48,14 +48,25 @@ class Matrix:
         """
         Set the values of the whole matrix.
 
-        :arg: val: either a NumPy array or a scalar
-            number
+        :arg: val: either a :class:`Matrix` instance,
+            a NumPy array or a scalar number
         """
-        if isinstance(val, np.ndarray):
+        if isinstance(val, Matrix):
+            self.set(val.array)
+        elif isinstance(val, np.ndarray):
             self.array[:, :] = val
         else:
             self.array[:, :] = val * np.ones(self.shape)
         return self
+
+    def copy(self):
+        """
+        Create an identical :class:`Matrix`
+        instance.
+        """
+        A = Matrix(self.function_space)
+        A.set(self)
+        return A
 
     def scale(self, alpha):
         """
