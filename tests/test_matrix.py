@@ -28,13 +28,6 @@ def function_space(r_space):
     return FunctionSpace(mesh, *element)
 
 
-def try_compute_full_hessian(*args):
-    try:
-        return compute_full_hessian(*args)
-    except NotImplementedError:
-        pytest.xfail("Full Hessian R-space only")  # TODO
-
-
 def test_matrix_ops(r_space):
     """
     Test that all of the operations associated with
@@ -83,19 +76,21 @@ def test_hessian(r_space, gradient):
     """
     fs = function_space(r_space)
     test = TestFunction(fs)
-    x = Function(fs).assign(1.0)
-    c = Control(x)
+    x, y = SpatialCoordinate(fs.mesh())
+    X = Function(fs).interpolate(x)
+    c = Control(X)
 
     # Define some functional that depends only on the control
-    J = assemble((x ** 2 + x + 1) * dx)
+    J = assemble((X ** 3 + X ** 2 + X + 1) * dx)
 
     # Compute its gradient and check the accuracy
     if gradient:
         g = compute_gradient(J, c)
-        dJdx = assemble(test * (2 * x + 1) * dx)
-        assert np.isclose(errornorm(g, dJdx), 0)
+        dJdX = assemble(test * (3 * X ** 2 + 2 * X + 1) * dx)
+        assert np.isclose(errornorm(g, dJdX), 0)
 
     # Compute its Hessian and check the accuracy
-    H = try_compute_full_hessian(J, c)
-    d2Jdx2 = Matrix(fs).set(2.0)
-    assert np.allclose(H.array, d2Jdx2.array)
+    H = compute_full_hessian(J, c)
+    d2JdX2 = assemble(test * (6 * X + 2) * dx)
+    expected = Matrix(fs).set(d2JdX2.dat.data)
+    assert np.allclose(H.array, expected.array)
