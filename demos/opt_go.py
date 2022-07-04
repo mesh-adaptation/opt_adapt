@@ -34,7 +34,7 @@ model_options = {
     "no_exports": True,
     "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
 }
-options = {
+params = OptAdaptParameters({
     "disp": args.disp,
     "lr": args.lr,
     "maxiter": args.maxiter,
@@ -43,7 +43,7 @@ options = {
     "target_inc": 0.1 * target,
     "target_max": target,
     "model_options": model_options,
-}
+})
 
 
 def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
@@ -119,7 +119,7 @@ try:
         mesh,
         setup.initial_control,
         adapt_fn=adapt_go,
-        options=options,
+        params=params,
         op=op
     )
     cpu_time = perf_counter() - cpu_timestamp

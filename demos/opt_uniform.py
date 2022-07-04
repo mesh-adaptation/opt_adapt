@@ -1,5 +1,5 @@
 from thetis import create_directory, File
-from opt_adapt.opt import OptimisationProgress, minimise
+from opt_adapt.opt import *
 import argparse
 import importlib
 import numpy as np
@@ -21,7 +21,7 @@ parser.add_argument("--disp", type=int, default=1)
 args = parser.parse_args()
 demo = args.demo
 n = args.n
-options = {
+params = OptAdaptParameters({
     "disp": args.disp,
     "lr": args.lr,
     "maxiter": args.maxiter,
@@ -30,7 +30,7 @@ options = {
         "no_exports": True,
         "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
     },
-}
+})
 
 setup = importlib.import_module(f"{demo}.setup")
 mesh = setup.initial_mesh(n=n)
@@ -38,7 +38,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 try:
-    m_opt = minimise(setup.forward_run, mesh, setup.initial_control, options=options, op=op)
+    m_opt = minimise(setup.forward_run, mesh, setup.initial_control, params=params, op=op)
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 except Exception as exc:

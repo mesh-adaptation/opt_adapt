@@ -26,7 +26,7 @@ args = parser.parse_args()
 demo = args.demo
 n = args.n
 target = args.target
-options = {
+params = OptAdaptParameters({
     "disp": args.disp,
     "lr": args.lr,
     "gtol": args.gtol,
@@ -38,7 +38,7 @@ options = {
         "no_exports": True,
         "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
     },
-}
+})
 
 
 def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
@@ -72,7 +72,7 @@ try:
         mesh,
         setup.initial_control,
         adapt_fn=adapt_hessian_based,
-        options=options,
+        params=params,
         op=op,
     )
     cpu_time = perf_counter() - cpu_timestamp
