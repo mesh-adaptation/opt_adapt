@@ -53,6 +53,12 @@ def test_matrix_ops(r_space):
     C.add(A)
     assert np.allclose(B.array, C.array)
 
+    # Likewise for += and -=
+    C -= A
+    assert np.allclose(A.array, C.array)
+    C += A
+    assert np.allclose(B.array, C.array)
+
     # Check that scaling works
     C.scale(0.5)
     assert np.allclose(A.array, C.array)
