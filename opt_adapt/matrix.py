@@ -3,7 +3,7 @@ import firedrake_adjoint as fd_adj
 import numpy as np
 
 
-__class__ = ["Matrix", "compute_full_hessian"]
+__class__ = ["Matrix", "OuterProductMatrix", "compute_full_hessian"]
 
 
 class Matrix:
@@ -136,6 +136,16 @@ class Matrix:
         solution = fd.Function(self.function_space)
         solution.dat.data[:] = u.reshape(f.shape)
         return solution
+
+
+def OuterProductMatrix(f, g):
+    r"""
+    Construct a :class:`Matrix` by taking the outer
+    product of two :class:`Function`\s.
+    """
+    fs = f.function_space()
+    assert fs == g.function_space()
+    return Matrix(fs).set(np.outer(f.dat.data, g.dat.data))
 
 
 def compute_full_hessian(J, u):
