@@ -57,7 +57,7 @@ def test_matrix_ops(r_space):
     C.scale(0.5)
     assert np.allclose(A.array, C.array)
 
-    # Check that vector multiplication works
+    # Check matrix-vector multiplication works
     v = Function(fs).assign(1.0)
     w = B.multiply(v)
     expected = Function(fs).assign(2.0)
@@ -66,6 +66,13 @@ def test_matrix_ops(r_space):
     # Check that solving works
     w = B.solve(v)
     expected.assign(0.5)
+    assert np.isclose(errornorm(expected, w), 0.0)
+
+    # Check vector-matrix multiplication works
+    A.set(np.random.rand(*A.shape))
+    w = A.multiply(v, side="left")
+    A.transpose()
+    expected = A.multiply(v)
     assert np.isclose(errornorm(expected, w), 0.0)
 
 
