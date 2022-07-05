@@ -95,6 +95,14 @@ class Matrix:
         assert isinstance(other, Matrix)
         self.array[:, :] -= other.array
 
+    def __iadd__(self, other):
+        self.add(other)
+        return self
+
+    def __isub__(self, other):
+        self.subtract(other)
+        return self
+
     def transpose(self):
         """
         Transpose the matrix.
