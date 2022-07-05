@@ -90,16 +90,23 @@ class Matrix:
         """
         self.array[:, :] = self.array.transpose()
 
-    def multiply(self, v):
+    def multiply(self, v, side="right"):
         """
         Compute a matrix-vector product.
 
         :arg v: either a :class:`Function` instance
             or an appropriate data array
+        :kwarg side: either ``'left'`` or ``'right'``,
+            depending on which product is desired
         """
         if isinstance(v, fd.Function):
             v = v.dat.data
-        Av = np.dot(self.array, v)
+        if side == "right":
+            Av = np.dot(self.array, v)
+        elif side == "left":
+            Av = np.dot(v, self.array)
+        else:
+            raise ValueError(f"side should be 'left' or 'right', not {side}")
         out = fd.Function(self.function_space)
         out.dat.data[:] = Av.reshape(v.shape)
         return out
