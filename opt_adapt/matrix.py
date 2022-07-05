@@ -84,6 +84,12 @@ class Matrix:
         assert isinstance(other, Matrix)
         self.array[:, :] -= other.array
 
+    def transpose(self):
+        """
+        Transpose the matrix.
+        """
+        self.array[:, :] = self.array.transpose()
+
     def multiply(self, v):
         """
         Compute a matrix-vector product.
