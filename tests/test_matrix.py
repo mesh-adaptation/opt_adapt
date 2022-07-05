@@ -68,6 +68,11 @@ def test_matrix_ops(r_space):
     expected.assign(0.5)
     assert np.isclose(errornorm(expected, w), 0.0)
 
+    # Check that the outer product works
+    A = OuterProductMatrix(v, v)
+    B.set(1.0)
+    assert np.allclose(A.array, B.array)
+
     # Check vector-matrix multiplication works
     A.set(np.random.rand(*A.shape))
     w = A.multiply(v, side="left")
