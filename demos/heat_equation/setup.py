@@ -2,11 +2,11 @@ from firedrake import *
 from firedrake_adjoint import * 
 
 
-def initial_mesh():
+def initial_mesh(n):
     """
     Construction of initial mesh
     """
-    return RectangleMesh(5, 5, (-1,1), (-1,1))
+    return RectangleMesh(5*n, 5*n, (-n,n), (-n,n))
 
 def initial_control(mesh):
     """

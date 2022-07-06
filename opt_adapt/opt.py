@@ -93,10 +93,10 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
 
     # Take a step downhill
     u -= lr * dJ
-    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
+    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": None}
 
 
-def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
+def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     """
     A second order routine
     """
@@ -116,15 +116,15 @@ def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
                 s -= u_
                 y = dJ.copy(deepcopy=True)
                 y -= dJ_
-                lr = s/y
+                lr = s.dat.data[0]/y.dat.data[0]
             u -= lr * dJ
-            yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
+            yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": None}
         else:
             B = Matrix(u.function_space())
-            lr = params.lr
+            lr = 1
             P = B.solve(dJ)
-            u -= P
-            yield {"lr": lr, "u+": u, "u-": None, "dJ-": None}
+            u -= lr * P
+            yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": B}
     
     else:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
@@ -148,11 +148,11 @@ def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     
         P = B.solve(dJ)
         lr = 20
-        u -= lr*P
-        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
+        u -= lr * P
+        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
 
-def _newton(forward_run, m, params, u, Rspace=False):
+def _newton(it, forward_run, m, params, u, Rspace=False):
     """
     A second order routine
     """
@@ -168,7 +168,7 @@ def _newton(forward_run, m, params, u, Rspace=False):
     
     lr = 1
     u -= lr * P
-    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None} 
+    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None} 
 
 
 _implemented_methods = {
@@ -238,6 +238,7 @@ def minimise(
     Rspace = u_plus.ufl_element().family() == "Real"
     dJ_init = None
     target = params.target_base
+    B = None
 
     # Enter the optimisation loop
     nc_ = mesh.num_cells()
@@ -251,7 +252,6 @@ def minimise(
             args = (u_plus, u_, dJ_)
         elif order == 2:
             if method == "BFGS":
-                B = None
                 args = (u_plus, u_, dJ_, B)
             if method == "newton":
                 args = (u_plus)
@@ -264,7 +264,7 @@ def minimise(
         for o in step(it, forward_run, mesh, params, *args, Rspace=Rspace):
             out.update(o)
         J, u, dJ = out["J"], out["u"], out["dJ"]
-        lr, u_plus, u_, dJ_ = out["lr"], out["u+"], out["u-"], out["dJ-"]
+        lr, u_plus, u_, dJ_, B = out["lr"], out["u+"], out["u-"], out["dJ-"], out["B"]
 
         # Print to screen, if requested
         if params.disp > 0:
