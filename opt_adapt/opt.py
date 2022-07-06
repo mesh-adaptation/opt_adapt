@@ -168,7 +168,7 @@ def _newton_method(forward_run, m, params, u, Rspace=False):
 _implemented_methods = {
     "gradient_descent": {"func": _gradient_descent, "order": 1},
     "BFGS": {"func": _BFGS, "order": 2},
-    "_newton_method": {"func": _newton_method, "order": 2},
+    "newton_method": {"func": _newton_method, "order": 2},
 }
 
 
@@ -243,10 +243,10 @@ def minimise(
         dJ_ = None if it == 1 else op.dJdm_progress[-1]
         if order == 1:
             args = (u_plus, u_, dJ_)
-        if method == _BFGS:
+        if method == "BFGS":
             B = None
             args = (u_plus, u_, dJ_, B)
-        if method == _newton_method:
+        if method == "newton_method":
             args = (u_plus)
         else:
             raise NotImplementedError(f"Method unavailable")
