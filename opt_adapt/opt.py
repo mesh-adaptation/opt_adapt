@@ -3,11 +3,12 @@ import firedrake_adjoint as fd_adj
 from firedrake.adjoint import get_solve_blocks
 import ufl
 
-from opt_adapt.utils import pprint
+from utils import pprint
 
 import numpy as np
 from time import perf_counter
 
+from matrix import *
 
 __all__ = ["OptimisationProgress", "OptAdaptParameters", "identity_mesh", "get_state", "minimise"]
 
@@ -94,9 +95,80 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
     u -= lr * dJ
     yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
 
+# A second order routine
+def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
+    
+    J, u = forward_run(m, u, **params.model_options)
+    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
+    
+    # if B is in R-space, B always be none
+    if B is None:
+        if Rspace:
+            if u_ is None or dJ_ is None:
+                lr = params.lr
+            else:
+                dJ_ = fd.Function(dJ).assign(dJ_)
+                u_ = fd.Function(u).assign(u_)
+                s = u - u_
+                y = dJ - dJ_
+                lr = s/y
+            u -= lr * dJ
+            yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
+        else:
+            B = Matrix(u.function_space())
+            lr = params.lr
+            P = B.solve(dJ)
+            u -= P
+            yield {"lr": lr, "u+": u, "u-": None, "dJ-": None}
+    
+    else:
+        dJ_ = params.transfer_fn(dJ_, dJ.function_space())
+        u_ = params.transfer_fn(u_, u.function_space())
+        
+        s = params.transfer_fn(u - u_, u.function_space())
+        y = params.transfer_fn(dJ - dJ_, dJ.function_space())
+        
+        y_star_s = np.dot(y.dat.data, y.dat.data) 
+        y_y_star = OuterProductMatrix(y,y)
+        second_term = y_y_star.scale(1/y_star_s)
+        
+        Bs = B.multiply(s) 
+        sBs = np.dot(s.dat.data, Bs.dat.data)
+        sB = B.multiply(s, side="left")
+        BssB = OuterProductMatrix(Bs,sB)
+        third_term = BssB.scale(1/sBs)
+        
+        B.add(second_term)
+        B.subtract(third_term)
+    
+        P = B.solve(dJ)
+        lr = 20
+        u -= lr*P
+        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
+
+# A second order routine
+def _newton_method(forward_run, m, params, u, Rspace=False):
+
+    J, u = forward_run(m, u, **params.model_options)
+    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    H = compute_full_hessian(J, fd_adj.Control(u))
+    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
+    
+    try: 
+        P = H.solve(dJ)
+    except np.linalg.LinAlgError:
+        raise Exception("Hessian is singular, please try the other methods")
+    
+    lr = 1
+    u -= lr * P
+    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None} 
+
 
 _implemented_methods = {
     "gradient_descent": {"func": _gradient_descent, "order": 1},
+    "BFGS": {"func": _BFGS, "order": 2},
+    "_newton_method": {"func": _newton_method, "order": 2},
 }
 
 
@@ -171,8 +243,13 @@ def minimise(
         dJ_ = None if it == 1 else op.dJdm_progress[-1]
         if order == 1:
             args = (u_plus, u_, dJ_)
+        if method == _BFGS:
+            B = None
+            args = (u_plus, u_, dJ_, B)
+        if method == _newton_method:
+            args = (u_plus)
         else:
-            raise NotImplementedError(f"Only order 1 methods are supported, not {order}")
+            raise NotImplementedError(f"Method unavailable")
 
         # Take a step
         cpu_timestamp = perf_counter()
