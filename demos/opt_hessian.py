@@ -1,5 +1,5 @@
 from pyroteus.log import pyrint
-from pyroteus.utility import create_director, File
+from pyroteus.utility import create_directory, File
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
 from pyroteus.metric import space_normalise, enforce_element_constraints
@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(
 pwd = os.path.abspath(os.path.dirname(__file__))
 choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
 parser.add_argument("demo", type=str, choices=choices)
+parser.add_argument("--method", type=str, default="gradient_descent")
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
@@ -25,6 +26,7 @@ parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=2)
 args = parser.parse_args()
 demo = args.demo
+method = args.method
 n = args.n
 target = args.target
 params = OptAdaptParameters({
@@ -40,6 +42,7 @@ params = OptAdaptParameters({
         "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
     },
 })
+pyrint(f"Using method {method}")
 
 
 def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):

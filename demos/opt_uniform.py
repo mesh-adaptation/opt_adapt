@@ -1,3 +1,4 @@
+from pyroteus.log import pyrint
 from pyroteus.utility import create_directory, File
 from opt_adapt.opt import *
 import argparse
@@ -13,6 +14,7 @@ parser = argparse.ArgumentParser(
 pwd = os.path.abspath(os.path.dirname(__file__))
 choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
 parser.add_argument("demo", type=str, choices=choices)
+parser.add_argument("--method", type=str, default="gradient_descent")
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
@@ -20,6 +22,7 @@ parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=1)
 args = parser.parse_args()
 demo = args.demo
+method = args.method
 n = args.n
 params = OptAdaptParameters({
     "disp": args.disp,
@@ -31,6 +34,7 @@ params = OptAdaptParameters({
         "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
     },
 })
+pyrint(f"Using method {method}")
 
 setup = importlib.import_module(f"{demo}.setup")
 mesh = setup.initial_mesh(n=n)
@@ -38,7 +42,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 try:
-    m_opt = minimise(setup.forward_run, mesh, setup.initial_control, params=params, op=op)
+    m_opt = minimise(setup.forward_run, mesh, setup.initial_control, method=method, params=params, op=op)
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 except Exception as exc:
