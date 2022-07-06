@@ -128,6 +128,7 @@ try:
         adapt_fn=adapt_go,
         method=method,
         params=params,
+        method=method,
         op=op,
     )
     cpu_time = perf_counter() - cpu_timestamp

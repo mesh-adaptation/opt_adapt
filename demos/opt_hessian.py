@@ -81,6 +81,7 @@ try:
         adapt_fn=adapt_hessian_based,
         method=method,
         params=params,
+        method=method,
         op=op,
     )
     cpu_time = perf_counter() - cpu_timestamp

@@ -1,5 +1,8 @@
 from firedrake import *
 from firedrake_adjoint import *
+from pyroteus.metric import *
+from pyroteus.recovery import *
+from opt_adapt.opt import get_state
 
 
 def initial_mesh(n):
@@ -41,3 +44,16 @@ def forward_run(mesh, control, **kwargs):
     J = assemble(0.5 * inner(u - u_desired, u - u_desired) / nrm * dx)
 
     return J, m
+
+def hessian(mesh, **kwargs):
+    """
+    Recover the Hessian of the state.
+
+    :kwarg adjoint: If ``True``, recover the
+        Hessian of the adjoint state, rather
+        than the forward one.
+    """
+    c = get_state(**kwargs)
+    H = hessian_metric(recover_hessian(c))
+    M = space_normalise(H, 1000.0, "inf")
+    return M
