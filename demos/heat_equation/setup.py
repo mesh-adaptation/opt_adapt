@@ -1,19 +1,25 @@
 from firedrake import *
 from firedrake_adjoint import * 
 
-# Construction of initial mesh
-def mesh_initial():
+
+def initial_mesh():
+    """
+    Construction of initial mesh
+    """
     return RectangleMesh(5, 5, (-1,1), (-1,1))
 
-# The initial of control parameter
-# In this example, control parameter is not in Real space
-def control_initial(mesh):
+def initial_control(mesh):
+    """
+    The initial of control parameter
+    In this example, control parameter is not in Real space
+    """
     W = FunctionSpace(mesh, "DG", degree=0)
     return Function(W, name="Control")
 
-# Solve the PDEs in the given mesh
-def forward_run(mesh, control):
-    
+def forward_run(mesh, control, **kwargs):
+    """
+    Solve the PDEs in the given mesh
+    """
     V = FunctionSpace(mesh, "CG", 1)
     u = Function(V, name="State")
     W = FunctionSpace(mesh, "DG", degree=0)
@@ -33,10 +39,11 @@ def forward_run(mesh, control):
     
     return J, m
 
-# Using the function in Firedrake
-# to computed an approximated solution
 def automated_(mesh, control):
-    
+    """
+    Using the function in Firedrake
+    to computed an approximated solution
+    """
     J, m = forward_run(mesh, control)
     Jhat = ReducedFunctional(J, Control(m))
     # Make sure you have scipy >= 0.11 installed

@@ -3,12 +3,12 @@ import firedrake_adjoint as fd_adj
 from firedrake.adjoint import get_solve_blocks
 import ufl
 
-from utils import pprint
+from opt_adapt.utils import pprint
 
 import numpy as np
 from time import perf_counter
 
-from matrix import *
+from opt_adapt.matrix import *
 
 __all__ = ["OptimisationProgress", "OptAdaptParameters", "identity_mesh", "get_state", "minimise"]
 
@@ -95,9 +95,11 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
     u -= lr * dJ
     yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
 
-# A second order routine
+
 def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
-    
+    """
+    A second order routine
+    """
     J, u = forward_run(m, u, **params.model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
@@ -110,8 +112,8 @@ def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
             else:
                 dJ_ = fd.Function(dJ).assign(dJ_)
                 u_ = fd.Function(u).assign(u_)
-                s = u - u_
-                y = dJ - dJ_
+                s = fd.assemble(u - u_)
+                y = fd.assemble(dJ - dJ_)
                 lr = s/y
             u -= lr * dJ
             yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
@@ -147,9 +149,11 @@ def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         u -= lr*P
         yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
 
-# A second order routine
-def _newton_method(forward_run, m, params, u, Rspace=False):
 
+def _newton(forward_run, m, params, u, Rspace=False):
+    """
+    A second order routine
+    """
     J, u = forward_run(m, u, **params.model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     H = compute_full_hessian(J, fd_adj.Control(u))
@@ -168,7 +172,7 @@ def _newton_method(forward_run, m, params, u, Rspace=False):
 _implemented_methods = {
     "gradient_descent": {"func": _gradient_descent, "order": 1},
     "BFGS": {"func": _BFGS, "order": 2},
-    "newton_method": {"func": _newton_method, "order": 2},
+    "newton": {"func": _newton, "order": 2},
 }
 
 
@@ -224,7 +228,7 @@ def minimise(
     try:
         step, order = _implemented_methods[method].values()
     except KeyError:
-        raise ValueError(f"Method '{method}' not recognised")
+        raise ValueError(f"Method {method} unavailable")
     op = op or OptimisationProgress()
     tape = fd_adj.get_working_tape()
     tape.clear_tape()
@@ -243,11 +247,12 @@ def minimise(
         dJ_ = None if it == 1 else op.dJdm_progress[-1]
         if order == 1:
             args = (u_plus, u_, dJ_)
-        if method == "BFGS":
-            B = None
-            args = (u_plus, u_, dJ_, B)
-        if method == "newton_method":
-            args = (u_plus)
+        elif order == 2:
+            if method == "BFGS":
+                B = None
+                args = (u_plus, u_, dJ_, B)
+            if method == "newton":
+                args = (u_plus)
         else:
             raise NotImplementedError(f"Method unavailable")
 
