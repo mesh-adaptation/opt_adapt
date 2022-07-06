@@ -112,8 +112,10 @@ def _BFGS(forward_run, m, params, u, u_, dJ_, B, Rspace=False):
             else:
                 dJ_ = fd.Function(dJ).assign(dJ_)
                 u_ = fd.Function(u).assign(u_)
-                s = fd.assemble(u - u_)
-                y = fd.assemble(dJ - dJ_)
+                s = u.copy(deepcopy=True)
+                s -= u_
+                y = dJ.copy(deepcopy=True)
+                y -= dJ_
                 lr = s/y
             u -= lr * dJ
             yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
@@ -228,7 +230,7 @@ def minimise(
     try:
         step, order = _implemented_methods[method].values()
     except KeyError:
-        raise ValueError(f"Method {method} unavailable")
+        raise ValueError(f"Method '{method}' not recognised")
     op = op or OptimisationProgress()
     tape = fd_adj.get_working_tape()
     tape.clear_tape()
@@ -254,7 +256,7 @@ def minimise(
             if method == "newton":
                 args = (u_plus)
         else:
-            raise NotImplementedError(f"Method unavailable")
+            raise NotImplementedError(f"Method {method} unavailable")
 
         # Take a step
         cpu_timestamp = perf_counter()
