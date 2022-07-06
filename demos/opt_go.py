@@ -1,11 +1,12 @@
-from thetis import create_directory, print_output, File
 from firedrake import *
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
 from firedrake.adjoint import get_solve_blocks
 from pyroteus.error_estimation import *
+from pyroteus.log import pyrint
 from pyroteus.metric import *
 from pyroteus.recovery import *
+from pyroteus.utility import create_directory, File
 from opt_adapt.opt import *
 import argparse
 import importlib
@@ -64,7 +65,7 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     q_star_plg = Function(V_plus)
     tm.prolong(q_star, q_star_plg)
     if args.disp > 2:
-        print_output("Base fields prolonged.")
+        pyrint("Base fields prolonged.")
 
     # Solve the forward and adjoint problem in the enriched space
     # TODO: avoid forward solve
@@ -81,7 +82,7 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     ref_tape.clear_tape()
     set_working_tape(tape)
     if args.disp > 2:
-        print_output("Error estimation complete.")
+        pyrint("Error estimation complete.")
 
     # Extract an error indicator and project it back down
     q_star_plus -= q_star_plg
@@ -89,7 +90,7 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     indicator = project(indicator_plus, FunctionSpace(mesh, "DG", 0))
     indicator.interpolate(abs(indicator))
     if args.disp > 2:
-        print_output("Error estimator projected.")
+        pyrint("Error estimator projected.")
 
     # Construct an anisotropic metric
     metric = anisotropic_metric(
@@ -101,10 +102,10 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     space_normalise(metric, target, "inf")
     enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
     if args.disp > 2:
-        print_output("Metric construction complete.")
+        pyrint("Metric construction complete.")
     newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
     if args.disp > 2:
-        print_output("Mesh adaptation complete.")
+        pyrint("Mesh adaptation complete.")
     return newmesh
 
 

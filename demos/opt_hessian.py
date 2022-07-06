@@ -1,4 +1,5 @@
-from thetis import create_directory, print_output, File
+from pyroteus.log import pyrint
+from pyroteus.utility import create_director, File
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
 from pyroteus.metric import space_normalise, enforce_element_constraints
@@ -54,10 +55,10 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     metric = space_normalise(setup.hessian(mesh), target, norm_order)
     enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
     if args.disp > 2:
-        print_output("Metric construction complete.")
+        pyrint("Metric construction complete.")
     newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
     if args.disp > 2:
-        print_output("Mesh adaptation complete.")
+        pyrint("Mesh adaptation complete.")
     return newmesh
 
 
