@@ -103,22 +103,23 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
     
-    # if B is in R-space, B always be none
-    if B is None:
-        if Rspace:
-            if u_ is None or dJ_ is None:
-                lr = params.lr
-            else:
-                dJ_ = fd.Function(dJ).assign(dJ_)
-                u_ = fd.Function(u).assign(u_)
-                s = float(u) - float(u_)
-                y = float(dJ) - float(dJ_)
-                lr = s / y
-            u -= lr * dJ
-            yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": None}
-            return
+    if Rspace:
+        if u_ is None or dJ_ is None:
+            B = 1 
         else:
-            B = Matrix(u.function_space())
+            dJ_ = fd.Function(dJ).assign(dJ_)
+            u_ = fd.Function(u).assign(u_)
+            s = float(u) - float(u_)
+            y = float(dJ) - float(dJ_)
+            B = y / s
+        P = - float(dJ) / B
+        lr = 1
+        u += lr * P
+        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
+        return
+    
+    if B is None:
+        B = Matrix(u.function_space())
 
     P = B.solve(dJ)
     lr = params.lr
@@ -145,7 +146,6 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         
         B.add(second_term)
         B.subtract(third_term)
-    
     yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
 
