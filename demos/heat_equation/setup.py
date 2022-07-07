@@ -6,7 +6,7 @@ def initial_mesh(n):
     """
     Construction of initial mesh
     """
-    return RectangleMesh(5*n, 5*n, (-n,n), (-n,n))
+    return RectangleMesh(5 * n, 5 * n, (-1, 1), (-1, 1))
 
 def initial_control(mesh):
     """
@@ -35,7 +35,8 @@ def forward_run(mesh, control, **kwargs):
     # and simulated temperature profile
     x = SpatialCoordinate(mesh)
     u_desired = exp(-1/(1-x[0]*x[0])-1/(1-x[1]*x[1]))
-    J = assemble((0.5*inner(u-u_desired, u-u_desired))*dx)
+    nrm = assemble(inner(u_desired, u_desired) * dx)
+    J = assemble(0.5 * inner(u - u_desired, u - u_desired) / nrm * dx)
     
     return J, m
 

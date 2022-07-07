@@ -145,9 +145,9 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         
         B.add(second_term)
         B.subtract(third_term)
-    
+
         P = B.solve(dJ)
-        lr = 20
+        lr = 1
         u -= lr * P
         yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
@@ -251,10 +251,7 @@ def minimise(
         if order == 1:
             args = (u_plus, u_, dJ_)
         elif order == 2:
-            if method == "BFGS":
-                args = (u_plus, u_, dJ_, B)
-            if method == "newton":
-                args = (u_plus)
+            args = (u_plus, u_, dJ_, B)
         else:
             raise NotImplementedError(f"Method {method} unavailable")
 
@@ -345,3 +342,4 @@ def minimise(
         # Clean up
         tape.clear_tape()
     return u_plus
+    
