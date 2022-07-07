@@ -53,6 +53,29 @@ class OptAdaptParameters:
                 raise ValueError(f"Option {key} not recognised")
             self.__setattr__(key, value)
 
+# Only works for problem with control paramter in r-space
+def line_search(forward_run, mesh, u, P, J, dJ, Rspace, alpha=1e-4, max_search_iter=100):
+    
+    lr = 1
+    if Rspace:
+        initial_slope = float(dJ) * float(P)
+    else:
+        initial_slope = np.dot(dJ.dat.data, P.dat.data)
+
+    if initial_slope==0.0:
+        return 1.0
+    
+    for i in range(max_search_iter):
+        u_plus = u + lr*P 
+        J_plus, u_plus = forward_run(mesh, u_plus)
+        # check Armijo rule:
+        if J_plus-J <= alpha*lr*initial_slope:
+            break
+        lr /= 2
+    else:
+        raise Exception("Line search did not converge")
+    return lr
+
 
 def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
     """
@@ -104,26 +127,26 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
     
     if Rspace:
-        if u_ is None or dJ_ is None:
-            B = 1 
-        else:
-            dJ_ = fd.Function(dJ).assign(dJ_)
-            u_ = fd.Function(u).assign(u_)
-            s = float(u) - float(u_)
-            y = float(dJ) - float(dJ_)
-            B = y / s
-        P = - float(dJ) / B
-        lr = 1
-        u += lr * P
-        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
-        return
+            if u_ is None or dJ_ is None:
+                B = 1 
+            else:
+                dJ_ = fd.Function(dJ).assign(dJ_)
+                u_ = fd.Function(u).assign(u_)
+                s = float(u) - float(u_)
+                y = float(dJ) - float(dJ_)
+                B = y / s
+            P = -float(dJ) / B
+            lr = line_search(forward_run, m, u, P, J, dJ, Rspace)
+            u += lr * P
+            yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
+            return
     
     if B is None:
         B = Matrix(u.function_space())
 
-    P = B.solve(dJ)
+    P = B.scale(-1).solve(dJ)
     lr = params.lr
-    u -= lr * P
+    u += lr * P
 
     if u_ is not None and dJ_ is not None:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
@@ -146,6 +169,7 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         
         B.add(second_term)
         B.subtract(third_term)
+
     yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
 
@@ -159,12 +183,12 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
     
     try: 
-        P = H.solve(dJ)
+        P = H.scale(-1).solve(dJ)
     except np.linalg.LinAlgError:
         raise Exception("Hessian is singular, please try the other methods")
     
-    lr = 1
-    u -= lr * P
+    lr = line_search(forward_run, m, u, P, J, dJ, Rspace)
+    u += lr * P
     yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None} 
 
 
