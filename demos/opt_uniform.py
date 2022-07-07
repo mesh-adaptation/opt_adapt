@@ -58,14 +58,14 @@ else:
         failed = True
 create_directory(f"{demo}/data")
 np.save(
-    f"{demo}/data/uniform_progress_m_{n}",
+    f"{demo}/data/uniform_progress_m_{n}_{method}",
     np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
 )
-np.save(f"{demo}/data/uniform_progress_J_{n}", op.J_progress)
+np.save(f"{demo}/data/uniform_progress_J_{n}_{method}", op.J_progress)
 np.save(
-    f"{demo}/data/uniform_progress_dJdm_{n}",
+    f"{demo}/data/uniform_progress_dJdm_{n}_{method}",
     np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
 )
-with open(f"{demo}/data/uniform_{n}.log", "w+") as f:
+with open(f"{demo}/data/uniform_{n}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")

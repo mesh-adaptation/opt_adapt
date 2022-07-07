@@ -135,14 +135,14 @@ except Exception as exc:
     failed = True
 create_directory(f"{demo}/data")
 np.save(
-    f"{demo}/data/go_progress_m_{target:.0f}",
+    f"{demo}/data/go_progress_m_{target:.0f}_{method}",
     np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
 )
-np.save(f"{demo}/data/go_progress_J_{target:.0f}", op.J_progress)
+np.save(f"{demo}/data/go_progress_J_{target:.0f}_{method}", op.J_progress)
 np.save(
-    f"{demo}/data/go_progress_dJdm_{target:.0f}",
+    f"{demo}/data/go_progress_dJdm_{target:.0f}_{method}",
     np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
 )
-with open(f"{demo}/data/go_{target:.0f}.log", "w+") as f:
+with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
