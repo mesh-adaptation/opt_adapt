@@ -13,8 +13,8 @@ def initial_control(mesh):
     The initial of control parameter
     In this example, control parameter is not in Real space
     """
-    W = FunctionSpace(mesh, "DG", degree=0)
-    return Function(W, name="Control")
+    R = FunctionSpace(mesh, "R", 0)
+    return Function(R).assign(0.1)
 
 def forward_run(mesh, control, **kwargs):
     """
@@ -22,8 +22,8 @@ def forward_run(mesh, control, **kwargs):
     """
     V = FunctionSpace(mesh, "CG", 1)
     u = Function(V, name="State")
-    W = FunctionSpace(mesh, "DG", degree=0)
-    m = Function(W).assign(control)
+    R = FunctionSpace(mesh, "R", 0)
+    m = Function(R).assign(control)
     v = TestFunction(V)
 
     # Run the forward model once to create the simulation record
