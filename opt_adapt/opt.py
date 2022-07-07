@@ -111,28 +111,29 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
             else:
                 dJ_ = fd.Function(dJ).assign(dJ_)
                 u_ = fd.Function(u).assign(u_)
-                s = u.copy(deepcopy=True)
-                s -= u_
-                y = dJ.copy(deepcopy=True)
-                y -= dJ_
-                lr = s.dat.data[0]/y.dat.data[0]
+                s = float(u) - float(u_)
+                y = float(dJ) - float(dJ_)
+                lr = s / y
             u -= lr * dJ
             yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": None}
+            return
         else:
             B = Matrix(u.function_space())
-            lr = 1
-            P = B.solve(dJ)
-            u -= lr * P
-            yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": B}
-    
-    else:
+
+    P = B.solve(dJ)
+    lr = params.lr
+    u -= lr * P
+
+    if u_ is not None and dJ_ is not None:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
         
-        s = params.transfer_fn(u - u_, u.function_space())
-        y = params.transfer_fn(dJ - dJ_, dJ.function_space())
+        s = u.copy(deepcopy=True)
+        s -= u_
+        y = dJ.copy(deepcopy=True)
+        y -= dJ_
         
-        y_star_s = np.dot(y.dat.data, y.dat.data) 
+        y_star_s = np.dot(y.dat.data, s.dat.data) 
         y_y_star = OuterProductMatrix(y,y)
         second_term = y_y_star.scale(1/y_star_s)
         
@@ -144,11 +145,8 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         
         B.add(second_term)
         B.subtract(third_term)
-
-        P = B.solve(dJ)
-        lr = params.lr
-        u -= lr * P
-        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
+    
+    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
 
 def _newton(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
