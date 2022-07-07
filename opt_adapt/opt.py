@@ -57,7 +57,6 @@ class OptAdaptParameters:
 def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
     """
     Take one gradient descent iteration.
-
     :arg it: the current iteration number
     :arg forward_run: a Python function that
         implements the forward model and
@@ -147,12 +146,12 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         B.subtract(third_term)
 
         P = B.solve(dJ)
-        lr = 1
+        lr = 100
         u -= lr * P
         yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
 
-def _newton(it, forward_run, m, params, u, Rspace=False):
+def _newton(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     """
     A second order routine
     """
@@ -190,7 +189,6 @@ def get_state(adjoint=False, tape=None):
     """
     Extract the current state from the tape (velocity and
     elevation).
-
     :kwarg adjoint: If ``True``, return the corresponding
         adjoint state variables.
     """
@@ -211,7 +209,6 @@ def minimise(
     Custom minimisation routine, where the tape is
     re-annotated each iteration in order to support
     mesh adaptation.
-
     :arg forward_run: a Python function that
         implements the forward model and
         computes the objective functional
@@ -342,4 +339,3 @@ def minimise(
         # Clean up
         tape.clear_tape()
     return u_plus
-    
