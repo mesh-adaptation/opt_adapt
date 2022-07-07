@@ -146,7 +146,7 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         B.subtract(third_term)
 
         P = B.solve(dJ)
-        lr = 100
+        lr = params.lr
         u -= lr * P
         yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
 
