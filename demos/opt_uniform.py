@@ -20,6 +20,7 @@ parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=1)
+parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
 demo = args.demo
 method = args.method
@@ -41,15 +42,20 @@ mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
-try:
+if args.debug:
     m_opt = minimise(setup.forward_run, mesh, setup.initial_control, method=method, params=params, op=op)
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
-except Exception as exc:
-    cpu_time = perf_counter() - cpu_timestamp
-    print(f"Uniform optimisation failed after {cpu_time:.2f}s")
-    print(f"Reason: {exc}")
-    failed = True
+else:
+    try:
+        m_opt = minimise(setup.forward_run, mesh, setup.initial_control, method=method, params=params, op=op)
+        cpu_time = perf_counter() - cpu_timestamp
+        print(f"Uniform optimisation completed in {cpu_time:.2f}s")
+    except Exception as exc:
+        cpu_time = perf_counter() - cpu_timestamp
+        print(f"Uniform optimisation failed after {cpu_time:.2f}s")
+        print(f"Reason: {exc}")
+        failed = True
 create_directory(f"{demo}/data")
 np.save(
     f"{demo}/data/uniform_progress_m_{n}",
