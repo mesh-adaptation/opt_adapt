@@ -10,7 +10,13 @@ from time import perf_counter
 
 from opt_adapt.matrix import *
 
-__all__ = ["OptimisationProgress", "OptAdaptParameters", "identity_mesh", "get_state", "minimise"]
+__all__ = [
+    "OptimisationProgress",
+    "OptAdaptParameters",
+    "identity_mesh",
+    "get_state",
+    "minimise",
+]
 
 
 class OptimisationProgress:
@@ -54,7 +60,9 @@ class OptAdaptParameters:
             self.__setattr__(key, value)
 
 
-def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_search_iter=100):
+def line_search(
+    forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_search_iter=100
+):
     """
     To compute the learning rate (lr)
     """
@@ -68,16 +76,16 @@ def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_
 
     if np.isclose(initial_slope, 0.0):
         return params.lr
-    
+
     pprint(f"  Applying line search with alpha = {alpha} and tau = {tau}")
     ext = ""
     for i in range(max_search_iter):
         pprint(f"  {i:3d}:      lr = {lr:.4e}{ext}")
-        u_plus = u + lr*P 
+        u_plus = u + lr * P
         J_plus, u_plus = forward_run(mesh, u_plus)
         ext = f"  diff {J_plus - J:.4e}"
         # check Armijo rule:
-        if J_plus-J <= alpha*lr*initial_slope:
+        if J_plus - J <= alpha * lr * initial_slope:
             break
         lr *= tau
     else:
@@ -134,22 +142,22 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     J, u = forward_run(m, u, **params.model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
-    
+
     if Rspace:
-            if u_ is None or dJ_ is None:
-                B = 1 
-            else:
-                dJ_ = fd.Function(dJ).assign(dJ_)
-                u_ = fd.Function(u).assign(u_)
-                s = float(u) - float(u_)
-                y = float(dJ) - float(dJ_)
-                B = y / s
-            P = -float(dJ) / B
-            lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
-            u += lr * P
-            yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
-            return
-    
+        if u_ is None or dJ_ is None:
+            B = 1
+        else:
+            dJ_ = fd.Function(dJ).assign(dJ_)
+            u_ = fd.Function(u).assign(u_)
+            s = float(u) - float(u_)
+            y = float(dJ) - float(dJ_)
+            B = y / s
+        P = -float(dJ) / B
+        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+        u += lr * P
+        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
+        return
+
     if B is None:
         B = Matrix(u.function_space())
 
@@ -160,22 +168,22 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     if u_ is not None and dJ_ is not None:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
-        
+
         s = u.copy(deepcopy=True)
         s -= u_
         y = dJ.copy(deepcopy=True)
         y -= dJ_
-        
-        y_star_s = np.dot(y.dat.data, s.dat.data) 
-        y_y_star = OuterProductMatrix(y,y)
-        second_term = y_y_star.scale(1/y_star_s)
-        
-        Bs = B.multiply(s) 
+
+        y_star_s = np.dot(y.dat.data, s.dat.data)
+        y_y_star = OuterProductMatrix(y, y)
+        second_term = y_y_star.scale(1 / y_star_s)
+
+        Bs = B.multiply(s)
         sBs = np.dot(s.dat.data, Bs.dat.data)
         sB = B.multiply(s, side="left")
-        BssB = OuterProductMatrix(Bs,sB)
-        third_term = BssB.scale(1/sBs)
-        
+        BssB = OuterProductMatrix(Bs, sB)
+        third_term = BssB.scale(1 / sBs)
+
         B.add(second_term)
         B.subtract(third_term)
 
@@ -190,15 +198,15 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     H = compute_full_hessian(J, fd_adj.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
-    
-    try: 
+
+    try:
         P = H.scale(-1).solve(dJ)
     except np.linalg.LinAlgError:
         raise Exception("Hessian is singular, please try the other methods")
-    
+
     lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
     u += lr * P
-    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None} 
+    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None}
 
 
 _implemented_methods = {

@@ -37,16 +37,18 @@ model_options = {
     "no_exports": True,
     "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
 }
-params = OptAdaptParameters({
-    "disp": args.disp,
-    "lr": args.lr,
-    "maxiter": args.maxiter,
-    "gtol": args.gtol,
-    "target_base": 0.2 * target,
-    "target_inc": 0.1 * target,
-    "target_max": target,
-    "model_options": model_options,
-})
+params = OptAdaptParameters(
+    {
+        "disp": args.disp,
+        "lr": args.lr,
+        "maxiter": args.maxiter,
+        "gtol": args.gtol,
+        "target_base": 0.2 * target,
+        "target_inc": 0.1 * target,
+        "target_max": target,
+        "model_options": model_options,
+    }
+)
 pyrint(f"Using method {method}")
 
 
@@ -124,7 +126,7 @@ try:
         setup.initial_control,
         adapt_fn=adapt_go,
         params=params,
-        op=op
+        op=op,
     )
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Goal-oriented optimisation completed in {cpu_time:.2f}s")

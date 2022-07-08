@@ -29,19 +29,21 @@ demo = args.demo
 method = args.method
 n = args.n
 target = args.target
-params = OptAdaptParameters({
-    "disp": args.disp,
-    "lr": args.lr,
-    "gtol": args.gtol,
-    "maxiter": args.maxiter,
-    "target_base": 0.2 * target,
-    "target_inc": 0.1 * target,
-    "target_max": target,
-    "model_options": {
-        "no_exports": True,
-        "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
-    },
-})
+params = OptAdaptParameters(
+    {
+        "disp": args.disp,
+        "lr": args.lr,
+        "gtol": args.gtol,
+        "maxiter": args.maxiter,
+        "target_base": 0.2 * target,
+        "target_inc": 0.1 * target,
+        "target_max": target,
+        "model_options": {
+            "no_exports": True,
+            "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
+        },
+    }
+)
 pyrint(f"Using method {method}")
 
 

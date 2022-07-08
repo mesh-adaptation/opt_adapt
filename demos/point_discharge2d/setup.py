@@ -57,7 +57,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     scale, xs, ys = Constant(100.0), Constant(2.0), Constant(5.0)
     r2 = (x - xs) ** 2 + (y - ys) ** 2
     d = max_value(sqrt(r2), r)
-    source = scale * exp(-r2 / r ** 2)
+    source = scale * exp(-r2 / r**2)
 
     # Define physical parameters
     D = Constant(0.1)
@@ -97,7 +97,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     c_ana = 0.5 * q / (pi * D) * exp(Pe * (x - xs)) * bessk0(Pe * d)
 
     # Define quantity of interest
-    kernel = conditional(r2 > r ** 2, 1, 0)
+    kernel = conditional(r2 > r**2, 1, 0)
     area = assemble(Constant(1.0, domain=mesh) * dx)
     J = assemble(kernel * (c - c_ana) ** 2 / area * dx, ad_block_tag="qoi")
     return J, r

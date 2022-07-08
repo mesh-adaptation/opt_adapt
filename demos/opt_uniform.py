@@ -25,16 +25,18 @@ args = parser.parse_args()
 demo = args.demo
 method = args.method
 n = args.n
-params = OptAdaptParameters({
-    "disp": args.disp,
-    "lr": args.lr,
-    "maxiter": args.maxiter,
-    "gtol": args.gtol,
-    "model_options": {
-        "no_exports": True,
-        "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
-    },
-})
+params = OptAdaptParameters(
+    {
+        "disp": args.disp,
+        "lr": args.lr,
+        "maxiter": args.maxiter,
+        "gtol": args.gtol,
+        "model_options": {
+            "no_exports": True,
+            "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
+        },
+    }
+)
 pyrint(f"Using method {method}")
 
 setup = importlib.import_module(f"{demo}.setup")
@@ -43,12 +45,26 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 if args.debug:
-    m_opt = minimise(setup.forward_run, mesh, setup.initial_control, method=method, params=params, op=op)
+    m_opt = minimise(
+        setup.forward_run,
+        mesh,
+        setup.initial_control,
+        method=method,
+        params=params,
+        op=op,
+    )
     cpu_time = perf_counter() - cpu_timestamp
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 else:
     try:
-        m_opt = minimise(setup.forward_run, mesh, setup.initial_control, method=method, params=params, op=op)
+        m_opt = minimise(
+            setup.forward_run,
+            mesh,
+            setup.initial_control,
+            method=method,
+            params=params,
+            op=op,
+        )
         cpu_time = perf_counter() - cpu_timestamp
         print(f"Uniform optimisation completed in {cpu_time:.2f}s")
     except Exception as exc:
