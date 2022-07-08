@@ -2,7 +2,6 @@ import firedrake as fd
 import firedrake_adjoint as fd_adj
 from firedrake.adjoint import get_solve_blocks
 import ufl
-import math
 
 from opt_adapt.utils import pprint
 
@@ -60,6 +59,7 @@ def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_
     To compute the learning rate (lr)
     """
     lr = params.lr
+    tau = 0.5
 
     if Rspace:
         initial_slope = float(dJ) * float(P)
@@ -69,7 +69,7 @@ def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_
     if np.isclose(initial_slope, 0.0):
         return params.lr
     
-    pprint(f"  Applying line search with alpha = {alpha} and tau = {0.5}")
+    pprint(f"  Applying line search with alpha = {alpha} and tau = {tau}")
     ext = ""
     for i in range(max_search_iter):
         pprint(f"  {i:3d}:      lr = {lr:.4e}{ext}")
@@ -79,7 +79,7 @@ def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_
         # check Armijo rule:
         if J_plus-J <= alpha*lr*initial_slope:
             break
-        lr /= 2
+        lr *= tau
     else:
         raise Exception("Line search did not converge")
     pprint(f"  converged lr = {lr:.4e}")
