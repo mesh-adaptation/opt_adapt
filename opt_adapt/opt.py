@@ -8,8 +8,15 @@ from opt_adapt.utils import pprint
 import numpy as np
 from time import perf_counter
 
+from opt_adapt.matrix import *
 
-__all__ = ["OptimisationProgress", "OptAdaptParameters", "identity_mesh", "get_state", "minimise"]
+__all__ = [
+    "OptimisationProgress",
+    "OptAdaptParameters",
+    "identity_mesh",
+    "get_state",
+    "minimise",
+]
 
 
 class OptimisationProgress:
@@ -53,10 +60,43 @@ class OptAdaptParameters:
             self.__setattr__(key, value)
 
 
+def line_search(
+    forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_search_iter=100
+):
+    """
+    To compute the learning rate (lr)
+    """
+    lr = params.lr
+    tau = 0.5
+
+    if Rspace:
+        initial_slope = float(dJ) * float(P)
+    else:
+        initial_slope = np.dot(dJ.dat.data, P.dat.data)
+
+    if np.isclose(initial_slope, 0.0):
+        return params.lr
+
+    pprint(f"  Applying line search with alpha = {alpha} and tau = {tau}")
+    ext = ""
+    for i in range(max_search_iter):
+        pprint(f"  {i:3d}:      lr = {lr:.4e}{ext}")
+        u_plus = u + lr * P
+        J_plus, u_plus = forward_run(mesh, u_plus)
+        ext = f"  diff {J_plus - J:.4e}"
+        # check Armijo rule:
+        if J_plus - J <= alpha * lr * initial_slope:
+            break
+        lr *= tau
+    else:
+        raise Exception("Line search did not converge")
+    pprint(f"  converged lr = {lr:.4e}")
+    return lr
+
+
 def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
     """
     Take one gradient descent iteration.
-
     :arg it: the current iteration number
     :arg forward_run: a Python function that
         implements the forward model and
@@ -95,8 +135,84 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
     yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
 
 
+def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
+    """
+    A second order routine
+    """
+    J, u = forward_run(m, u, **params.model_options)
+    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
+
+    if Rspace:
+        if u_ is None or dJ_ is None:
+            B = 1
+        else:
+            dJ_ = fd.Function(dJ).assign(dJ_)
+            u_ = fd.Function(u).assign(u_)
+            s = float(u) - float(u_)
+            y = float(dJ) - float(dJ_)
+            B = y / s
+        P = -float(dJ) / B
+        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+        u += lr * P
+        yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
+        return
+
+    if B is None:
+        B = Matrix(u.function_space())
+
+    P = B.scale(-1).solve(dJ)
+    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+    u += lr * P
+
+    if u_ is not None and dJ_ is not None:
+        dJ_ = params.transfer_fn(dJ_, dJ.function_space())
+        u_ = params.transfer_fn(u_, u.function_space())
+
+        s = u.copy(deepcopy=True)
+        s -= u_
+        y = dJ.copy(deepcopy=True)
+        y -= dJ_
+
+        y_star_s = np.dot(y.dat.data, s.dat.data)
+        y_y_star = OuterProductMatrix(y, y)
+        second_term = y_y_star.scale(1 / y_star_s)
+
+        Bs = B.multiply(s)
+        sBs = np.dot(s.dat.data, Bs.dat.data)
+        sB = B.multiply(s, side="left")
+        BssB = OuterProductMatrix(Bs, sB)
+        third_term = BssB.scale(1 / sBs)
+
+        B.add(second_term)
+        B.subtract(third_term)
+
+    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
+
+
+def _newton(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
+    """
+    A second order routine
+    """
+    J, u = forward_run(m, u, **params.model_options)
+    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    H = compute_full_hessian(J, fd_adj.Control(u))
+    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
+
+    try:
+        P = H.scale(-1).solve(dJ)
+    except np.linalg.LinAlgError:
+        raise Exception("Hessian is singular, please try the other methods")
+
+    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+    u += lr * P
+    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None}
+
+
 _implemented_methods = {
     "gradient_descent": {"func": _gradient_descent, "order": 1},
+    "BFGS": {"func": _BFGS, "order": 2},
+    "newton": {"func": _newton, "order": 2},
 }
 
 
@@ -112,7 +228,6 @@ def get_state(adjoint=False, tape=None):
     """
     Extract the current state from the tape (velocity and
     elevation).
-
     :kwarg adjoint: If ``True``, return the corresponding
         adjoint state variables.
     """
@@ -133,7 +248,6 @@ def minimise(
     Custom minimisation routine, where the tape is
     re-annotated each iteration in order to support
     mesh adaptation.
-
     :arg forward_run: a Python function that
         implements the forward model and
         computes the objective functional
@@ -160,6 +274,7 @@ def minimise(
     Rspace = u_plus.ufl_element().family() == "Real"
     dJ_init = None
     target = params.target_base
+    B = None
 
     # Enter the optimisation loop
     nc_ = mesh.num_cells()
@@ -171,8 +286,10 @@ def minimise(
         dJ_ = None if it == 1 else op.dJdm_progress[-1]
         if order == 1:
             args = (u_plus, u_, dJ_)
+        elif order == 2:
+            args = (u_plus, u_, dJ_, B)
         else:
-            raise NotImplementedError(f"Only order 1 methods are supported, not {order}")
+            raise NotImplementedError(f"Method {method} unavailable")
 
         # Take a step
         cpu_timestamp = perf_counter()
@@ -181,6 +298,8 @@ def minimise(
             out.update(o)
         J, u, dJ = out["J"], out["u"], out["dJ"]
         lr, u_plus, u_, dJ_ = out["lr"], out["u+"], out["u-"], out["dJ-"]
+        if order > 1:
+            B = out["B"]
 
         # Print to screen, if requested
         if params.disp > 0:

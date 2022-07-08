@@ -99,12 +99,12 @@ def test_hessian(r_space, gradient):
     c = Control(X)
 
     # Define some functional that depends only on the control
-    J = assemble((X ** 3 + X ** 2 + X + 1) * dx)
+    J = assemble((X**3 + X**2 + X + 1) * dx)
 
     # Compute its gradient and check the accuracy
     if gradient:
         g = compute_gradient(J, c)
-        dJdX = assemble(test * (3 * X ** 2 + 2 * X + 1) * dx)
+        dJdX = assemble(test * (3 * X**2 + 2 * X + 1) * dx)
         assert np.isclose(errornorm(g, dJdX), 0)
 
     # Compute its Hessian and check the accuracy

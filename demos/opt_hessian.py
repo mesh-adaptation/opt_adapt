@@ -1,4 +1,5 @@
-from thetis import create_directory, print_output, File
+from pyroteus.log import pyrint
+from pyroteus.utility import create_directory, File
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
 from pyroteus.metric import space_normalise, enforce_element_constraints
@@ -16,6 +17,7 @@ parser = argparse.ArgumentParser(
 pwd = os.path.abspath(os.path.dirname(__file__))
 choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
 parser.add_argument("demo", type=str, choices=choices)
+parser.add_argument("--method", type=str, default="gradient_descent")
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
@@ -24,21 +26,25 @@ parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--disp", type=int, default=2)
 args = parser.parse_args()
 demo = args.demo
+method = args.method
 n = args.n
 target = args.target
-params = OptAdaptParameters({
-    "disp": args.disp,
-    "lr": args.lr,
-    "gtol": args.gtol,
-    "maxiter": args.maxiter,
-    "target_base": 0.2 * target,
-    "target_inc": 0.1 * target,
-    "target_max": target,
-    "model_options": {
-        "no_exports": True,
-        "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
-    },
-})
+params = OptAdaptParameters(
+    {
+        "disp": args.disp,
+        "lr": args.lr,
+        "gtol": args.gtol,
+        "maxiter": args.maxiter,
+        "target_base": 0.2 * target,
+        "target_inc": 0.1 * target,
+        "target_max": target,
+        "model_options": {
+            "no_exports": True,
+            "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
+        },
+    }
+)
+pyrint(f"Using method {method}")
 
 
 def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
@@ -54,10 +60,10 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     metric = space_normalise(setup.hessian(mesh), target, norm_order)
     enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
     if args.disp > 2:
-        print_output("Metric construction complete.")
+        pyrint("Metric construction complete.")
     newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
     if args.disp > 2:
-        print_output("Mesh adaptation complete.")
+        pyrint("Mesh adaptation complete.")
     return newmesh
 
 
@@ -84,14 +90,14 @@ except Exception as exc:
     failed = True
 create_directory(f"{demo}/data")
 np.save(
-    f"{demo}/data/hessian_progress_m_{target:.0f}",
+    f"{demo}/data/hessian_progress_m_{target:.0f}_{method}",
     np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
 )
-np.save(f"{demo}/data/hessian_progress_J_{target:.0f}", op.J_progress)
+np.save(f"{demo}/data/hessian_progress_J_{target:.0f}_{method}", op.J_progress)
 np.save(
-    f"{demo}/data/hessian_progress_dJdm_{target:.0f}",
+    f"{demo}/data/hessian_progress_dJdm_{target:.0f}_{method}",
     np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
 )
-with open(f"{demo}/data/hessian_{target:.0f}.log", "w+") as f:
+with open(f"{demo}/data/hessian_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
