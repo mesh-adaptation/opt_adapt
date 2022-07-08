@@ -55,6 +55,7 @@ class OptAdaptParameters:
 
 # Only works for problem with control paramter in r-space
 def line_search(forward_run, mesh, u, P, J, dJ, Rspace, alpha=1e-4, max_search_iter=100):
+    u = u.copy(deepcopy=True)
     
     lr = 1
     if Rspace:
@@ -65,15 +66,20 @@ def line_search(forward_run, mesh, u, P, J, dJ, Rspace, alpha=1e-4, max_search_i
     if initial_slope==0.0:
         return 1.0
     
+    pprint(f"  Applying line search with alpha = {alpha} and tau = {tau}")
+    ext = ""
     for i in range(max_search_iter):
+        pprint(f"  {i:3d}:      lr = {lr:.4e}{ext}")
         u_plus = u + lr*P 
         J_plus, u_plus = forward_run(mesh, u_plus)
+        ext = f"  diff {J_plus - J:.4e}"
         # check Armijo rule:
         if J_plus-J <= alpha*lr*initial_slope:
             break
         lr /= 2
     else:
         raise Exception("Line search did not converge")
+    pprint(f"  converged lr = {lr:.4e}")
     return lr
 
 
