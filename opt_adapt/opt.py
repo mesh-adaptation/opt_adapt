@@ -60,6 +60,7 @@ def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_
     To compute the learning rate (lr)
     """
     lr = params.lr
+
     if Rspace:
         initial_slope = float(dJ) * float(P)
     else:
@@ -68,15 +69,20 @@ def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_
     if np.isclose(initial_slope, 0.0):
         return params.lr
     
+    pprint(f"  Applying line search with alpha = {alpha} and tau = {0.5}")
+    ext = ""
     for i in range(max_search_iter):
+        pprint(f"  {i:3d}:      lr = {lr:.4e}{ext}")
         u_plus = u + lr*P 
         J_plus, u_plus = forward_run(mesh, u_plus)
+        ext = f"  diff {J_plus - J:.4e}"
         # check Armijo rule:
         if J_plus-J <= alpha*lr*initial_slope:
             break
         lr /= 2
     else:
         raise Exception("Line search did not converge")
+    pprint(f"  converged lr = {lr:.4e}")
     return lr
 
 
