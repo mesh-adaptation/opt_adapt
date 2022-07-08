@@ -39,16 +39,3 @@ def forward_run(mesh, control, **kwargs):
     J = assemble(0.5 * inner(u - u_desired, u - u_desired) / nrm * dx)
     
     return J, m
-
-def automated_(mesh, control):
-    """
-    Using the function in Firedrake
-    to computed an approximated solution
-    """
-    J, m = forward_run(mesh, control)
-    Jhat = ReducedFunctional(J, Control(m))
-    # Make sure you have scipy >= 0.11 installed
-    m_opt = minimize(Jhat, method = "L-BFGS-B",
-                tol=2e-08, bounds = (0, 0.5), options = {"disp": False})
-    
-    return Jhat(m_opt), m_opt

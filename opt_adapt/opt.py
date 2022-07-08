@@ -2,6 +2,7 @@ import firedrake as fd
 import firedrake_adjoint as fd_adj
 from firedrake.adjoint import get_solve_blocks
 import ufl
+import math
 
 from opt_adapt.utils import pprint
 
@@ -53,17 +54,19 @@ class OptAdaptParameters:
                 raise ValueError(f"Option {key} not recognised")
             self.__setattr__(key, value)
 
-# Only works for problem with control paramter in r-space
-def line_search(forward_run, mesh, u, P, J, dJ, Rspace, alpha=1e-4, max_search_iter=100):
-    
-    lr = 1
+
+def line_search(forward_run, mesh, u, P, J, dJ, params, Rspace, alpha=1e-1, max_search_iter=100):
+    """
+    To compute the learning rate (lr)
+    """
+    lr = params.lr
     if Rspace:
         initial_slope = float(dJ) * float(P)
     else:
         initial_slope = np.dot(dJ.dat.data, P.dat.data)
 
-    if initial_slope==0.0:
-        return 1.0
+    if np.isclose(initial_slope, 0.0):
+        return params.lr
     
     for i in range(max_search_iter):
         u_plus = u + lr*P 
@@ -115,7 +118,7 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_, Rspace=False):
 
     # Take a step downhill
     u -= lr * dJ
-    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": None}
+    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
 
 
 def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
@@ -136,7 +139,7 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
                 y = float(dJ) - float(dJ_)
                 B = y / s
             P = -float(dJ) / B
-            lr = line_search(forward_run, m, u, P, J, dJ, Rspace)
+            lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
             u += lr * P
             yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "B": B}
             return
@@ -145,7 +148,7 @@ def _BFGS(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
         B = Matrix(u.function_space())
 
     P = B.scale(-1).solve(dJ)
-    lr = params.lr
+    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
     u += lr * P
 
     if u_ is not None and dJ_ is not None:
@@ -187,7 +190,7 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     except np.linalg.LinAlgError:
         raise Exception("Hessian is singular, please try the other methods")
     
-    lr = line_search(forward_run, m, u, P, J, dJ, Rspace)
+    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
     u += lr * P
     yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None} 
 
@@ -280,7 +283,9 @@ def minimise(
         for o in step(it, forward_run, mesh, params, *args, Rspace=Rspace):
             out.update(o)
         J, u, dJ = out["J"], out["u"], out["dJ"]
-        lr, u_plus, u_, dJ_, B = out["lr"], out["u+"], out["u-"], out["dJ-"], out["B"]
+        lr, u_plus, u_, dJ_ = out["lr"], out["u+"], out["u-"], out["dJ-"]
+        if order > 1:
+            B = out["B"]
 
         # Print to screen, if requested
         if params.disp > 0:
