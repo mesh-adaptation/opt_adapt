@@ -56,7 +56,6 @@ pyrint(f"Using method {method}")
 def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     """
     Adapt the mesh w.r.t. an anisotropic goal-oriented metric.
-
     :kwarg target: desired target metric complexity
     :kwarg alpha: convergence rate parameter for anisotropic metric
     """

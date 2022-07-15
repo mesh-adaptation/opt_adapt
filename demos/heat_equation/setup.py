@@ -45,6 +45,7 @@ def forward_run(mesh, control, **kwargs):
 
     return J, m
 
+
 def hessian(mesh, **kwargs):
     """
     Recover the Hessian of the state.

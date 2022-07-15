@@ -52,7 +52,6 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     """
     Adapt the mesh w.r.t. the intersection of the Hessians of
     each component of velocity and pressure.
-
     :kwarg target: Desired metric complexity (continuous
         analogue of mesh vertex count).
     :kwarg norm_order: Normalisation order :math:`p` for the
