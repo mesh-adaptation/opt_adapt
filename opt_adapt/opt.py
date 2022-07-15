@@ -616,7 +616,6 @@ def minimise(
     nc = mesh.num_cells()
     nc_ = 0
     adaptor = adapt_fn
-    mesh_conv_it = []
     for it in range(1, params.maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
