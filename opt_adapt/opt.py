@@ -154,7 +154,7 @@ def line_search(forward_run, m, u, P, J, dJ, params):
 
 
 def dotproduct(f, g):
-    return np.dot(f[-1].dat.data, g[-1].dat.data)
+    return np.dot(f.dat.data, g.dat.data)
 
 
 def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
@@ -620,7 +620,7 @@ def minimise(
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
-        if it > 1 and mesh_adaptation:
+        if it > 2 and mesh_adaptation:
             J_ = op.J_progress[-2]
             if nc < nc_:
                 mesh_adaptation = False
@@ -642,7 +642,6 @@ def minimise(
                 continue
             else:
                 adaptor = adapt_fn
-                nc_ = nc
 
         if mesh_adaptation:
             # Ramp up the target complexity
@@ -650,6 +649,7 @@ def minimise(
             # Adapt the mesh
             mesh = adaptor(mesh, target=target, control=u_plus)
 
+            nc_ = nc
             nc = mesh.num_cells()
 
 
