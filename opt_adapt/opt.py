@@ -24,6 +24,7 @@ class OptimisationProgress:
     """
 
     def __init__(self):
+        self.t_progress = []
         self.J_progress = []
         self.m_progress = []
         self.dJ_progress = []
@@ -540,8 +541,8 @@ def minimise(
             B = out["ddJ"]
 
         # Print to screen, if requested
+        t = perf_counter() - cpu_timestamp
         if params.disp > 0:
-            t = perf_counter() - cpu_timestamp
             g = dJ.dat.data[0] if Rspace else fd.norm(dJ)
             msgs = [f"{it:3d}:  J = {J:9.4e}"]
             if Rspace:
@@ -556,6 +557,7 @@ def minimise(
             pprint(",  ".join(msgs))
 
         # Stash progress
+        op.t_progress.append(t)
         op.J_progress.append(J)
         op.m_progress.append(u)
         op.dJ_progress.append(dJ)
