@@ -18,7 +18,7 @@ parser.add_argument("--method", type=str, default="gradient_descent")
 parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
-parser.add_argument("--lr", type=float, default=0.01)
+parser.add_argument("--lr", type=float, default=None)
 parser.add_argument("--disp", type=int, default=1)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
@@ -26,7 +26,8 @@ demo = args.demo
 method = args.method
 n = args.n
 params = OptAdaptParameters(
-    {
+    method,
+    options={
         "disp": args.disp,
         "lr": args.lr,
         "maxiter": args.maxiter,
@@ -35,7 +36,7 @@ params = OptAdaptParameters(
             "no_exports": True,
             "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
         },
-    }
+    },
 )
 pyrint(f"Using method {method}")
 
@@ -73,15 +74,12 @@ else:
         print(f"Reason: {exc}")
         failed = True
 create_directory(f"{demo}/data")
-np.save(
-    f"{demo}/data/uniform_progress_m_{n}_{method}",
-    np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
-)
-np.save(f"{demo}/data/uniform_progress_J_{n}_{method}", op.J_progress)
-np.save(
-    f"{demo}/data/uniform_progress_dJdm_{n}_{method}",
-    np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
-)
+m = np.array([m.dat.data[0] for m in op.m_progress]).flatten()
+J = op.J_progress
+dJ = np.array([dj.dat.data[0] for dj in op.dJ_progress]).flatten()
+np.save(f"{demo}/data/uniform_progress_m_{n}_{method}", m)
+np.save(f"{demo}/data/uniform_progress_J_{n}_{method}", J)
+np.save(f"{demo}/data/uniform_progress_dJ_{n}_{method}", dJ)
 with open(f"{demo}/data/uniform_{n}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")

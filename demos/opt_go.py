@@ -26,7 +26,7 @@ parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
-parser.add_argument("--lr", type=float, default=0.01)
+parser.add_argument("--lr", type=float, default=None)
 parser.add_argument("--disp", type=int, default=2)
 args = parser.parse_args()
 demo = args.demo
@@ -38,7 +38,8 @@ model_options = {
     "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
 }
 params = OptAdaptParameters(
-    {
+    method,
+    options={
         "disp": args.disp,
         "lr": args.lr,
         "maxiter": args.maxiter,
@@ -47,7 +48,7 @@ params = OptAdaptParameters(
         "target_inc": 0.1 * target,
         "target_max": target,
         "model_options": model_options,
-    }
+    },
 )
 pyrint(f"Using method {method}")
 
@@ -125,6 +126,7 @@ try:
         mesh,
         setup.initial_control,
         adapt_fn=adapt_go,
+        method=method,
         params=params,
         op=op,
     )
@@ -136,15 +138,12 @@ except Exception as exc:
     print(f"Reason: {exc}")
     failed = True
 create_directory(f"{demo}/data")
-np.save(
-    f"{demo}/data/go_progress_m_{target:.0f}_{method}",
-    np.array([m.dat.data[0] for m in op.m_progress]).flatten(),
-)
-np.save(f"{demo}/data/go_progress_J_{target:.0f}_{method}", op.J_progress)
-np.save(
-    f"{demo}/data/go_progress_dJdm_{target:.0f}_{method}",
-    np.array([dj.dat.data[0] for dj in op.dJdm_progress]).flatten(),
-)
+m = np.array([m.dat.data[0] for m in op.m_progress]).flatten()
+J = op.J_progress
+dJ = np.array([dj.dat.data[0] for dj in op.dJ_progress]).flatten()
+np.save(f"{demo}/data/go_progress_m_{n}_{method}", m)
+np.save(f"{demo}/data/go_progress_J_{n}_{method}", J)
+np.save(f"{demo}/data/go_progress_dJ_{n}_{method}", dJ)
 with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
