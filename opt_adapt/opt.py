@@ -53,9 +53,9 @@ class OptAdaptParameters:
         Mesh-to-mesh interpolation method
         """
         if Rspace:
-            self.transfer_fn = fd.project
-        else:
             self.transfer_fn = lambda f, fs: fd.Function(fs).assign(f)
+        else:
+            self.transfer_fn = fd.project
 
         """
         Initial step length
@@ -67,6 +67,7 @@ class OptAdaptParameters:
             self.lr = 1.0
         else:
             self.lr = 0.001
+        self.lr_lowerbound = 1e-25
 
         """
         Parameters for combined optimisation-adaptation routine
@@ -591,8 +592,8 @@ def minimise(
             op.ddJ_progress.append(ddJ)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        #if np.isclose(lr, 0.0):
-            #raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
+        if lr < params.lr_lowerbound:
+            raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:

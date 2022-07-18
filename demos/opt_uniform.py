@@ -19,6 +19,7 @@ parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
+parser.add_argument("--lr_lowerbound", type=float, default=1e-25)
 parser.add_argument("--disp", type=int, default=1)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
@@ -30,6 +31,7 @@ params = OptAdaptParameters(
     options={
         "disp": args.disp,
         "lr": args.lr,
+        "lr_lowerbound": args.lr_lowerbound,
         "maxiter": args.maxiter,
         "gtol": args.gtol,
         "model_options": {
