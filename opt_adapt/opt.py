@@ -188,8 +188,19 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     yield {"lr": lr, "u+": u}
 
 
-def _adam(it, forward_run, m, params, u, a_, b_, Rspace=False,
-        beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def _adam(
+    it,
+    forward_run,
+    m,
+    params,
+    u,
+    a_,
+    b_,
+    Rspace=False,
+    beta_1=0.9,
+    beta_2=0.999,
+    epsilon=1e-8,
+):
     """
     Take one iteration of the Adam algorithm.
 
@@ -220,18 +231,22 @@ def _adam(it, forward_run, m, params, u, a_, b_, Rspace=False,
     # Find the descent direction
     if Rspace:
         dJ_square = fd.Function(dJ).assign(pow(float(dJ), 2))
-        a = fd.Function(dJ).assign(beta_1 * a_ + (1-beta_1)* dJ)
-        b = fd.Function(dJ).assign(beta_2 * b_  + (1-beta_2) * dJ_square)
-        a_hat = fd.Function(dJ).assign(a/(1-pow(beta_1, it)))
-        b_hat = fd.Function(dJ).assign(b/(1-pow(beta_2, it)))
-        P = fd.Function(dJ).assign(-1 * a_hat/(pow(b_hat, 0.5) + epsilon))
+        a = fd.Function(dJ).assign(beta_1 * a_ + (1 - beta_1) * dJ)
+        b = fd.Function(dJ).assign(beta_2 * b_ + (1 - beta_2) * dJ_square)
+        a_hat = fd.Function(dJ).assign(a / (1 - pow(beta_1, it)))
+        b_hat = fd.Function(dJ).assign(b / (1 - pow(beta_2, it)))
+        P = fd.Function(dJ).assign(-1 * a_hat / (pow(b_hat, 0.5) + epsilon))
     else:
-        dJ_square = params.transfer_fn(dJ*dJ, dJ.function_space())
-        a = params.transfer_fn(beta_1 * a_ + (1-beta_1)* dJ, dJ.function_space())
-        b = params.transfer_fn(beta_2 * b_  + (1-beta_2) * dJ_square, dJ.function_space())
-        a_hat = params.transfer_fn(a/(1-pow(beta_1, it)), dJ.function_space())
-        b_hat = params.transfer_fn(b/(1-pow(beta_2, it)), dJ.function_space())
-        P = params.transfer_fn(-1 * a_hat/(pow(b_hat, 0.5) + epsilon), dJ.function_space())
+        dJ_square = params.transfer_fn(dJ * dJ, dJ.function_space())
+        a = params.transfer_fn(beta_1 * a_ + (1 - beta_1) * dJ, dJ.function_space())
+        b = params.transfer_fn(
+            beta_2 * b_ + (1 - beta_2) * dJ_square, dJ.function_space()
+        )
+        a_hat = params.transfer_fn(a / (1 - pow(beta_1, it)), dJ.function_space())
+        b_hat = params.transfer_fn(b / (1 - pow(beta_2, it)), dJ.function_space())
+        P = params.transfer_fn(
+            -1 * a_hat / (pow(b_hat, 0.5) + epsilon), dJ.function_space()
+        )
 
     # Find step length and take a step downhill
     lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
@@ -313,7 +328,6 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
     yield {"lr": lr, "u+": u, "B": B}
 
 
-
 def twoloops(s, y, rho, dJ):
     """
     Compute the descent direction
@@ -331,7 +345,10 @@ def twoloops(s, y, rho, dJ):
             a[i] = rho[i] * np.dot(s[i].dat.data, q.dat.data)
             q -= a[i] * y[i]
 
-        H = Matrix(dJ.function_space()).scale(np.dot(s[-1].dat.data,y[-1].dat.data)/np.dot(y[-1].dat.data,y[-1].dat.data))
+        H = Matrix(dJ.function_space()).scale(
+            np.dot(s[-1].dat.data, y[-1].dat.data)
+            / np.dot(y[-1].dat.data, y[-1].dat.data)
+        )
         P = H.multiply(q)
 
         for i in range(n):
@@ -372,19 +389,22 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
         rho = []
         s = []
         y = []
-    
-    # Update the descent direction P 
+
+    # Update the descent direction P
     n_ = len(s)
     q = dJ_.copy(deepcopy=True)
     if n_ == 0:
         H = Matrix(dJ_.function_space())
-        P = H.multiply(q) 
+        P = H.multiply(q)
     else:
         a = np.empty((n_,))
-        for i in range(n_ - 1, -1, -1): 
+        for i in range(n_ - 1, -1, -1):
             a[i] = rho[i] * np.dot(s[i].dat.data, q.dat.data)
             q -= a[i] * y[i]
-        H = Matrix(dJ_.function_space()).scale(np.dot(s[-1].dat.data,y[-1].dat.data)/np.dot(y[-1].dat.data,y[-1].dat.data))
+        H = Matrix(dJ_.function_space()).scale(
+            np.dot(s[-1].dat.data, y[-1].dat.data)
+            / np.dot(y[-1].dat.data, y[-1].dat.data)
+        )
         P = H.multiply(q)
         for i in range(n_):
             b = rho[i] * np.dot(y[i].dat.data, P.dat.data)
@@ -394,25 +414,25 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     # Take a step downhill
     lr = line_search(forward_run, m, u_, P, J_, dJ_, params, Rspace)
     u = u_ + lr * P
-    
+
     J, u = forward_run(m, u, **params.model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     sk = u.copy(deepcopy=True)
     sk -= u_
     yk = dJ.copy(deepcopy=True)
     yk -= dJ_
-    
-    # Update three lists 
-    if np.dot(sk.dat.data,yk.dat.data) > 0:
+
+    # Update three lists
+    if np.dot(sk.dat.data, yk.dat.data) > 0:
         s.append(sk)
         y.append(yk)
-        rho.append(1.0/np.dot(sk.dat.data,yk.dat.data))   
-    if len(s) > n: 
+        rho.append(1.0 / np.dot(sk.dat.data, yk.dat.data))
+    if len(s) > n:
         rho.pop(0)
         s.pop(0)
         y.pop(0)
 
-    yield {"lr": lr, "u+": u, "rho":rho, "s": s, "y": y}
+    yield {"lr": lr, "u+": u, "rho": rho, "s": s, "y": y}
 
 
 def _newton(it, forward_run, m, params, u, Rspace=False):
@@ -625,19 +645,19 @@ def minimise(
         if step == _gradient_descent:
             args = [u_plus, u_, dJ_]
         elif step == _adam:
-            if it==1:
+            if it == 1:
                 a_ = None
                 b_ = None
             args = [u_plus, a_, b_]
         elif step == _bfgs:
-            if it==1:
+            if it == 1:
                 B = None
             args = [u_plus, u_, dJ_, B]
         elif step == _lbfgs:
-            if it==1:
+            if it == 1:
                 rho = None
                 s = None
-                y=None
+                y = None
             args = [u_plus, rho, s, y]
         elif step == _newton:
             args = [u_plus]
@@ -682,13 +702,15 @@ def minimise(
             op.ddJ_progress.append(ddJ)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        if lr<1e-25:
-            raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
+        if lr < 1e-25:
+            raise fd.ConvergenceError(
+                term_msg + "fail, because control variable didn't move"
+            )
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
             raise fd.ConvergenceError(term_msg + "dtol divergence")
-        
+
         # Check for gradient convergence
         if it == 1:
             dJ_init = fd.norm(dJ)
@@ -698,7 +720,7 @@ def minimise(
                 pprint(term_msg + "gtol convergence")
             break
         # For some situation, convergence should be true, but don't satisfy the above condition
-        elif np.abs(J-op.J_progress[-2])/J_init < 1e-5:
+        elif np.abs(J - op.J_progress[-2]) / J_init < 1e-5:
             if fd.norm(dJ) / dJ_init < 1e-3:
                 if params.disp > 0:
                     pprint(term_msg + "gtol convergence (second situation)")
@@ -708,28 +730,28 @@ def minimise(
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
-
         if it > 1 and mesh_adaptation is True:
             J_ = op.J_progress[-2]
             if nc < nc_:
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
-                        pprint("NOTE: turning adaptation off due to mesh converged")
+                    pprint("NOTE: turning adaptation off due to mesh converged")
             elif np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
                     pprint("NOTE: turning adaptation off due to qoi_rtol convergence")
-            elif np.abs(nc - nc_) <  params.element_rtol * nc_:
+            elif np.abs(nc - nc_) < params.element_rtol * nc_:
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
-                    pprint("NOTE: turning adaptation off due to element_rtol convergence")
+                    pprint(
+                        "NOTE: turning adaptation off due to element_rtol convergence"
+                    )
             else:
                 adaptor = adapt_fn
                 nc_ = nc
-
 
         if mesh_adaptation is True:
             # Ramp up the target complexity
