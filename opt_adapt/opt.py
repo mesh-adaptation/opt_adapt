@@ -67,7 +67,7 @@ class OptAdaptParameters:
             self.lr = 1.0
         else:
             self.lr = 0.001
-        self.lr_lowerbound = 1e-25
+        self.lr_lowerbound = 1e-8
 
         """
         Parameters for combined optimisation-adaptation routine
@@ -151,6 +151,10 @@ def line_search(forward_run, m, u, P, J, dJ, params):
     if disp > 0:
         pprint(f"  converged lr = {lr:.4e}")
     return lr
+
+
+def dotproduct(f, g):
+    return np.dot(f[-1].dat.data, g[-1].dat.data)
 
 
 def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
@@ -238,6 +242,7 @@ def _adam(
         b_hat = fd.Function(dJ).assign(b / (1 - pow(beta_2, it)))
         P = fd.Function(dJ).assign(-1 * a_hat / (pow(b_hat, 0.5) + epsilon))
     else:
+        # TODO: Avoid transferring UFL expressions
         dJ_square = params.transfer_fn(dJ * dJ, dJ.function_space())
         a = params.transfer_fn(beta_1 * a_ + (1 - beta_1) * dJ, dJ.function_space())
         b = params.transfer_fn(
@@ -296,15 +301,12 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     else:
         a = np.empty((n_,))
         for i in range(n_ - 1, -1, -1):
-            a[i] = rho[i] * np.dot(s[i].dat.data, q.dat.data)
+            a[i] = rho[i] * dotproduct(s[-1], q)
             q -= a[i] * y[i]
-        H = Matrix(dJ_.function_space()).scale(
-            np.dot(s[-1].dat.data, y[-1].dat.data)
-            / np.dot(y[-1].dat.data, y[-1].dat.data)
-        )
+        H = Matrix(dJ_.function_space()).scale(dotproduct(s[-1], y[-1])/dotproduct(y[-1], y[-1]))
         P = H.multiply(q)
         for i in range(n_):
-            b = rho[i] * np.dot(y[i].dat.data, P.dat.data)
+            b = rho[i] * dotproduct(y[-1], P)
             P += s[i] * (a[i] - b)
     P = Matrix(dJ_.function_space()).scale(-1).multiply(P)
 
@@ -323,7 +325,7 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     if np.dot(sk.dat.data, yk.dat.data) > 0:
         s.append(sk)
         y.append(yk)
-        rho.append(1.0 / np.dot(sk.dat.data, yk.dat.data))
+        rho.append(1.0 / dotproduct(sk, yk))
     if len(s) > n:
         rho.pop(0)
         s.pop(0)
@@ -397,12 +399,12 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
             y = dJ.copy(deepcopy=True)
             y -= dJ_
 
-            y_star_s = np.dot(y.dat.data, s.dat.data)
+            y_star_s = dotproduct(y, s)
             y_y_star = OuterProductMatrix(y, y)
             second_term = y_y_star.scale(1 / y_star_s)
 
             Bs = B.multiply(s)
-            sBs = np.dot(s.dat.data, Bs.dat.data)
+            sBs = dotproduct(s, Bs)
             sB = B.multiply(s, side="left")
             BssB = OuterProductMatrix(Bs, sB)
             third_term = BssB.scale(1 / sBs)
@@ -592,8 +594,9 @@ def minimise(
             op.ddJ_progress.append(ddJ)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        if lr < params.lr_lowerbound:
-            raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
+        if step == _BFGS or step == _LBFGS:
+            if lr < params.lr_lowerbound:
+                raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
@@ -624,16 +627,19 @@ def minimise(
                 adaptor = identity_mesh
                 if params.disp > 1:
                     pprint("NOTE: turning adaptation off due to mesh converged")
+                continue
             elif np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
                     pprint("NOTE: turning adaptation off due to qoi_rtol convergence")
+                continue
             elif np.abs(nc - nc_) < params.element_rtol * nc_:
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
                     pprint("NOTE: turning adaptation off due to element_rtol convergence")
+                continue
             else:
                 adaptor = adapt_fn
                 nc_ = nc
@@ -643,7 +649,7 @@ def minimise(
             target = min(target + params.target_inc, params.target_max)
             # Adapt the mesh
             mesh = adaptor(mesh, target=target, control=u_plus)
-            nc_ = nc
+
             nc = mesh.num_cells()
 
 

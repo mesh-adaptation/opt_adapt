@@ -1,3 +1,4 @@
+from opt_adapt.opt import _LBFGS
 from pyroteus.log import pyrint
 from pyroteus.utility import create_directory, File
 from opt_adapt.opt import *
@@ -20,6 +21,7 @@ parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
 parser.add_argument("--lr_lowerbound", type=float, default=1e-25)
+parser.add_argument("--check_lr", type=float, default=False)
 parser.add_argument("--disp", type=int, default=1)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
@@ -41,6 +43,7 @@ params = OptAdaptParameters(
     },
 )
 pyrint(f"Using method {method}")
+
 
 setup = importlib.import_module(f"{demo}.setup")
 mesh = setup.initial_mesh(n=n)
