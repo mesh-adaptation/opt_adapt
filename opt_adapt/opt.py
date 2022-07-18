@@ -202,7 +202,7 @@ def _adam(
     epsilon=1e-8,
 ):
     """
-    Take one iteration of the Adam algorithm.
+    Take one Adam iteration.
 
     :arg it: the current iteration number
     :arg forward_run: a Python function that
@@ -255,113 +255,9 @@ def _adam(
     yield {"lr": lr, "u+": u, "a-": a, "b-": b}
 
 
-def _bfgs(it, forward_run, m, params, u, u_, dJ_, B, Rspace=False):
-    """
-    Take one iteration of BFGS algorithm.
-
-    :arg it: the current iteration number
-    :arg forward_run: a Python function that
-        implements the forward model and
-        computes the objective functional
-    :arg m: the current mesh
-    :kwarg params: :class:`OptAdaptParameters` instance
-        containing parameters for the optimisation and
-        adaptation routines
-    :arg u: the current control value
-    :arg u_: the previous control value
-    :arg dJ_: the previous gradient value
-    :arg B: the current approximate inverted Hessian matrix
-    :kwarg Rspace: is the prognostic function
-        space of type 'Real'?
-    """
-
-    # Annotate the tape and compute the gradient
-    J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
-    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
-
-    if Rspace:
-        if u_ is None or dJ_ is None:
-            B = 1
-        else:
-            dJ_ = fd.Function(dJ).assign(dJ_)
-            u_ = fd.Function(u).assign(u_)
-            s = float(u) - float(u_)
-            y = float(dJ) - float(dJ_)
-            B = y / s
-        P = -float(dJ) / B
-        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
-        u += lr * P
-        yield {"lr": lr, "u+": u, "B": B}
-        return
-
-    if B is None:
-        B = Matrix(u.function_space())
-
-    # Take a step downhill
-    P = B.scale(-1).solve(dJ)
-    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
-    u += lr * P
-
-    # Update the approximated inverted Hessian matrix
-    if u_ is not None and dJ_ is not None:
-        dJ_ = params.transfer_fn(dJ_, dJ.function_space())
-        u_ = params.transfer_fn(u_, u.function_space())
-
-        s = u.copy(deepcopy=True)
-        s -= u_
-        y = dJ.copy(deepcopy=True)
-        y -= dJ_
-
-        y_star_s = np.dot(y.dat.data, s.dat.data)
-        y_y_star = OuterProductMatrix(y, y)
-        second_term = y_y_star.scale(1 / y_star_s)
-
-        Bs = B.multiply(s)
-        sBs = np.dot(s.dat.data, Bs.dat.data)
-        sB = B.multiply(s, side="left")
-        BssB = OuterProductMatrix(Bs, sB)
-        third_term = BssB.scale(1 / sBs)
-
-        B.add(second_term)
-        B.subtract(third_term)
-    yield {"lr": lr, "u+": u, "B": B}
-
-
-def twoloops(s, y, rho, dJ):
-    """
-    Compute the descent direction
-    """
-    n = len(s)
-    q = dJ.copy(deepcopy=True)
-
-    if n == 0:
-        H = Matrix(dJ.function_space())
-        P = H.multiply(q)
-    else:
-        a = np.empty((n,))
-
-        for i in range(n - 1, -1, -1):
-            a[i] = rho[i] * np.dot(s[i].dat.data, q.dat.data)
-            q -= a[i] * y[i]
-
-        H = Matrix(dJ.function_space()).scale(
-            np.dot(s[-1].dat.data, y[-1].dat.data)
-            / np.dot(y[-1].dat.data, y[-1].dat.data)
-        )
-        P = H.multiply(q)
-
-        for i in range(n):
-            b = rho[i] * np.dot(y[i].dat.data, P.dat.data)
-            P += s[i] * (a[i] - b)
-
-    P = Matrix(dJ.function_space()).scale(-1).multiply(P)
-    return P
-
-
 def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     """
-    Take one iteration of L-BFGS algorithm.
+    Take one L-BFGS iteration.
 
     :arg it: the current iteration number
     :arg forward_run: a Python function that
@@ -435,39 +331,6 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     yield {"lr": lr, "u+": u, "rho": rho, "s": s, "y": y}
 
 
-def _newton(it, forward_run, m, params, u, Rspace=False):
-    """
-    Take one iteration of Newton algorithm.
-
-    :arg it: the current iteration number
-    :arg forward_run: a Python function that
-        implements the forward model and
-        computes the objective functional
-    :arg m: the current mesh
-    :kwarg params: :class:`OptAdaptParameters` instance
-        containing parameters for the optimisation and
-        adaptation routines
-    :arg u: the current control value
-    :kwarg Rspace: is the prognostic function
-        space of type 'Real'?
-    """
-
-    # Annotate the tape and compute the gradient
-    J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
-    H = compute_full_hessian(J, fd_adj.Control(u))
-    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
-
-    try:
-        P = H.scale(-1).solve(dJ)
-    except np.linalg.LinAlgError:
-        raise Exception("Hessian is singular, please try the other methods")
-
-    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
-    u += lr * P
-    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "B": None}
-
-
 def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
     """
     Take one BFGS iteration.
@@ -500,28 +363,55 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
 
-        s = u.copy(deepcopy=True)
-        s -= u_
-        y = dJ.copy(deepcopy=True)
-        y -= dJ_
+    if Rspace:
+        if u_ is None or dJ_ is None:
+            B = 1
+        else:
+            dJ_ = fd.Function(dJ).assign(dJ_)
+            u_ = fd.Function(u).assign(u_)
+            s = float(u) - float(u_)
+            y = float(dJ) - float(dJ_)
+            B = y / s
+        P = -float(dJ) / B
+        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+        u += lr * P
+        yield {"lr": lr, "u+": u, "B": B}
 
-        y_star_s = np.dot(y.dat.data, s.dat.data)
-        y_y_star = OuterProductMatrix(y, y)
-        second_term = y_y_star.scale(1 / y_star_s)
+    else:
+        if B is None:
+            B = Matrix(u.function_space())
+        
+        # Take a step downhill
+        P = B.scale(-1).solve(dJ)
+        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+        u += lr * P
+        
+        # Update the approximated inverted Hessian matrix
+        if u_ is not None and dJ_ is not None:
+            dJ_ = params.transfer_fn(dJ_, dJ.function_space())
+            u_ = params.transfer_fn(u_, u.function_space())
 
-        Bs = B.multiply(s)
-        sBs = np.dot(s.dat.data, Bs.dat.data)
-        sB = B.multiply(s, side="left")
-        BssB = OuterProductMatrix(Bs, sB)
-        third_term = BssB.scale(1 / sBs)
+            s = u.copy(deepcopy=True)
+            s -= u_
+            y = dJ.copy(deepcopy=True)
+            y -= dJ_
 
-        B.add(second_term)
-        B.subtract(third_term)
+            y_star_s = np.dot(y.dat.data, s.dat.data)
+            y_y_star = OuterProductMatrix(y, y)
+            second_term = y_y_star.scale(1 / y_star_s)
 
-    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "ddJ": B}
+            Bs = B.multiply(s)
+            sBs = np.dot(s.dat.data, Bs.dat.data)
+            sB = B.multiply(s, side="left")
+            BssB = OuterProductMatrix(Bs, sB)
+            third_term = BssB.scale(1 / sBs)
+
+            B.add(second_term)
+            B.subtract(third_term)
+        yield {"lr": lr, "u+": u, "B": B}
 
 
-def _newton(it, forward_run, m, params, u, u_, dJ_, ddJ):
+def _newton(it, forward_run, m, params, u):
     """
     Take one full Newton iteration.
 
@@ -534,10 +424,9 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, ddJ):
         containing parameters for the optimisation and
         adaptation routines
     :arg u: the current control value
-    :arg u_: the previous control value (unused)
-    :arg dJ_: the previous gradient value (unused)
-    :arg ddJ: the previous Hessian value (unused)
     """
+
+    # Annotate the tape and compute the gradient
     J, u = forward_run(m, u, **params.model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     ddJ = compute_full_hessian(J, fd_adj.Control(u))
@@ -550,7 +439,11 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, ddJ):
 
     lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
-    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "ddJ": ddJ}
+
+    # Take a step downhill
+    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+    u += lr * P
+    yield {"lr": lr, "u+": u}
 
 
 _implemented_methods = {
@@ -627,14 +520,10 @@ def minimise(
     ddJ = None
     target = params.target_base
     B = None
-    if adapt_fn != identity_mesh:
-        mesh_adaptation = True
-    else:
-        mesh_adaptation = False
+    mesh_adaptation = adapt_fn != identity_mesh
 
     # Enter the optimisation loop
     nc = mesh.num_cells()
-    nc_ = 0
     adaptor = adapt_fn
     for it in range(1, params.maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
@@ -702,10 +591,8 @@ def minimise(
             op.ddJ_progress.append(ddJ)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        if lr < 1e-25:
-            raise fd.ConvergenceError(
-                term_msg + "fail, because control variable didn't move"
-            )
+        #if np.isclose(lr, 0.0):
+            #raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
@@ -714,13 +601,12 @@ def minimise(
         # Check for gradient convergence
         if it == 1:
             dJ_init = fd.norm(dJ)
-            J_init = np.abs(J)
         elif fd.norm(dJ) / dJ_init < params.gtol:
             if params.disp > 0:
                 pprint(term_msg + "gtol convergence")
             break
         # For some situation, convergence should be true, but don't satisfy the above condition
-        elif np.abs(J - op.J_progress[-2]) / J_init < 1e-5:
+        elif np.abs(J - op.J_progress[-2]) < params.qoi_rtol * op.J_progress[-2]:
             if fd.norm(dJ) / dJ_init < 1e-3:
                 if params.disp > 0:
                     pprint(term_msg + "gtol convergence (second situation)")
@@ -730,7 +616,7 @@ def minimise(
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
-        if it > 1 and mesh_adaptation is True:
+        if it > 1 and mesh_adaptation:
             J_ = op.J_progress[-2]
             if nc < nc_:
                 mesh_adaptation = False
@@ -746,19 +632,19 @@ def minimise(
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
-                    pprint(
-                        "NOTE: turning adaptation off due to element_rtol convergence"
-                    )
+                    pprint("NOTE: turning adaptation off due to element_rtol convergence")
             else:
                 adaptor = adapt_fn
                 nc_ = nc
 
-        if mesh_adaptation is True:
+        if mesh_adaptation:
             # Ramp up the target complexity
             target = min(target + params.target_inc, params.target_max)
             # Adapt the mesh
             mesh = adaptor(mesh, target=target, control=u_plus)
+            nc_ = nc
             nc = mesh.num_cells()
+
 
         # Clean up
         tape.clear_tape()
