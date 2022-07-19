@@ -91,6 +91,13 @@ class OptAdaptParameters:
         self.qoi_rtol = 0.005  # QoI relative tolerance
 
         """
+        Parameters lbfgs
+        """ 
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
+        self.epsilon = 1e-8
+
+        """
         Line search parameters
         """
         self.line_search = True
@@ -226,9 +233,9 @@ def _adam(it, forward_run, m, params, u, a_, b_):
     """
 
     lr = params.lr
-    beta_1=0.9
-    beta_2=0.999
-    epsilon=1e-8
+    beta_1 = params.beta_1
+    beta_2 = params.beta_2
+    epsilon = params.epsilon
 
     # Annotate the tape and compute the gradient
     J, u = forward_run(m, u, **params.model_options)
