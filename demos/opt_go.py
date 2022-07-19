@@ -27,7 +27,10 @@ parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
+parser.add_argument("--lr_lowerbound", type=float, default=1e-8)
+parser.add_argument("--check_lr", type=float, default=None)
 parser.add_argument("--disp", type=int, default=2)
+parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
 demo = args.demo
 method = args.method
@@ -37,11 +40,19 @@ model_options = {
     "no_exports": True,
     "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
 }
+
+# Setup initial mesh
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
+
+# Setup parameter class
 params = OptAdaptParameters(
     method,
     options={
         "disp": args.disp,
         "lr": args.lr,
+        "lr_lowerbound": args.lr_lowerbound,
+        "check_lr": args.lr,
         "maxiter": args.maxiter,
         "gtol": args.gtol,
         "target_base": 0.2 * target,
@@ -49,6 +60,7 @@ params = OptAdaptParameters(
         "target_max": target,
         "model_options": model_options,
     },
+    Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
 )
 pyrint(f"Using method {method}")
 
@@ -56,7 +68,6 @@ pyrint(f"Using method {method}")
 def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     """
     Adapt the mesh w.r.t. an anisotropic goal-oriented metric.
-
     :kwarg target: desired target metric complexity
     :kwarg alpha: convergence rate parameter for anisotropic metric
     """
@@ -115,12 +126,10 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     return newmesh
 
 
-setup = importlib.import_module(f"{demo}.setup")
-mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
-try:
+if args.debug:
     m_opt = minimise(
         setup.forward_run,
         mesh,
@@ -131,12 +140,25 @@ try:
         op=op,
     )
     cpu_time = perf_counter() - cpu_timestamp
-    print(f"Goal-oriented optimisation completed in {cpu_time:.2f}s")
-except Exception as exc:
-    cpu_time = perf_counter() - cpu_timestamp
-    print(f"Goal-oriented optimisation failed after {cpu_time:.2f}s")
-    print(f"Reason: {exc}")
-    failed = True
+    print(f"Uniform optimisation completed in {cpu_time:.2f}s")
+else:
+    try:
+        m_opt = minimise(
+            setup.forward_run,
+            mesh,
+            setup.initial_control,
+            adapt_fn=adapt_go,
+            method=method,
+            params=params,
+            op=op,
+        )
+        cpu_time = perf_counter() - cpu_timestamp
+        print(f"Goal-oriented optimisation completed in {cpu_time:.2f}s")
+    except Exception as exc:
+        cpu_time = perf_counter() - cpu_timestamp
+        print(f"Goal-oriented optimisation failed after {cpu_time:.2f}s")
+        print(f"Reason: {exc}")
+        failed = True
 create_directory(f"{demo}/data")
 m = np.array([m.dat.data[0] for m in op.m_progress]).flatten()
 J = op.J_progress

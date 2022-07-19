@@ -53,9 +53,9 @@ class OptAdaptParameters:
         Mesh-to-mesh interpolation method
         """
         if Rspace:
-            self.transfer_fn = fd.project
-        else:
             self.transfer_fn = lambda f, fs: fd.Function(fs).assign(f)
+        else:
+            self.transfer_fn = fd.project
 
         """
         Initial step length
@@ -63,19 +63,39 @@ class OptAdaptParameters:
         lr = options.pop("lr", None)
         if lr is not None:
             self.lr = lr
-        elif "newton" in _implemented_methods[method]["type"]:
-            self.lr = 1.0
-        else:
+        elif method == "gradient_descent":
             self.lr = 0.001
+        else:
+            self.lr = 0.1
+        self.lr_lowerbound = 1e-8
+
+        """
+        Whether needs to check lr
+        """
+        check_lr = options.pop("check_lr", None)
+        if lr is not None:
+            self.check_lr = check_lr
+        elif "quasi_newton" in _implemented_methods[method]["type"]:
+            self.check_lr = True
+        else:
+            self.check_lr = False
 
         """
         Parameters for combined optimisation-adaptation routine
         """
         self.maxiter = 101  # Maximum iteration count
         self.gtol = 1.0e-05  # Gradient relative tolerance
+        self.gtol_loose = 1.0e-03 
         self.dtol = 1.0001  # Divergence tolerance i.e. 0.01% increase
         self.element_rtol = 0.005  # Element count relative tolerance
         self.qoi_rtol = 0.005  # QoI relative tolerance
+
+        """
+        Parameters of Adam
+        """ 
+        self.beta_1 = 0.9
+        self.beta_2 = 0.999
+        self.epsilon = 1e-8
 
         """
         Line search parameters
@@ -99,6 +119,13 @@ class OptAdaptParameters:
             self.__setattr__(key, value)
 
 
+def dotproduct(f, g):
+    """
+    The dotproduct of two varaible in the same functionspace.
+    """
+    return np.dot(f.dat.data, g.dat.data)
+
+
 def line_search(forward_run, m, u, P, J, dJ, params):
     """
     Apply a backtracking line search method to
@@ -109,13 +136,14 @@ def line_search(forward_run, m, u, P, J, dJ, params):
         computes the objective functional
     :arg m: the current mesh
     :arg u: the current control value
-    :arg P: the current control value
-    :arg J: the current objective value
+    :arg P: the current descent direction
+    :arg J: the current value of objective function
     :arg dJ: the current gradient value
     :kwarg params: :class:`OptAdaptParameters` instance
         containing parameters for the optimisation and
         adaptation routines
     """
+
     lr = params.lr
     if not params.line_search:
         return lr
@@ -125,7 +153,7 @@ def line_search(forward_run, m, u, P, J, dJ, params):
     disp = params.disp
 
     # Compute initial slope
-    initial_slope = np.dot(dJ.dat.data, P.dat.data)
+    initial_slope = dotproduct(dJ, P)
     if np.isclose(initial_slope, 0.0):
         return params.lr
 
@@ -184,7 +212,125 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
 
     # Take a step downhill
     u -= lr * dJ
-    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_}
+    yield {"lr": lr, "u+": u}
+
+
+def _adam(it, forward_run, m, params, u, a_, b_):
+    """
+    Take one Adam iteration.
+
+    :arg it: the current iteration number
+    :arg forward_run: a Python function that
+        implements the forward model and
+        computes the objective functional
+    :arg m: the current mesh
+    :kwarg params: :class:`OptAdaptParameters` instance
+        containing parameters for the optimisation and
+        adaptation routines
+    :arg u: the current control value
+    :arg a_: the previous first moment variable value
+    :arg b_: the previous second moment variable value
+    """
+
+    lr = params.lr
+    beta_1 = params.beta_1
+    beta_2 = params.beta_2
+    epsilon = params.epsilon
+
+    # Annotate the tape and compute the gradient
+    J, u = forward_run(m, u, **params.model_options)
+    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
+
+    if a_ is None or b_ is None:
+        a_ = fd.Function(dJ.function_space())
+        b_ = fd.Function(dJ.function_space())
+
+    # Find the descent direction
+    dJ_square = fd.Function(dJ)
+    dJ_square *= dJ
+    a = fd.Function(dJ).assign(beta_1 * a_ + (1 - beta_1) * dJ)
+    b = fd.Function(dJ).assign(beta_2 * b_ + (1 - beta_2) * dJ_square)
+    a_hat = fd.Function(dJ).assign(a / (1 - pow(beta_1, it)))
+    b_hat = fd.Function(dJ).assign(b / (1 - pow(beta_2, it)))
+    P = fd.Function(dJ).assign(-1 * a_hat / (pow(b_hat, 0.5) + epsilon))
+
+    # Take a step downhill
+    lr = line_search(forward_run, m, u, P, J, dJ, params)
+    u += lr * P
+
+    yield {"lr": lr, "u+": u, "a-": a, "b-": b}
+
+
+def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
+    """
+    Take one L-BFGS iteration.
+
+    :arg it: the current iteration number
+    :arg forward_run: a Python function that
+        implements the forward model and
+        computes the objective functional
+    :arg m: the current mesh
+    :kwarg params: :class:`OptAdaptParameters` instance
+        containing parameters for the optimisation and
+        adaptation routines
+    :arg u: the current control value
+    :arg rho: the list to store previous n rhok values
+    :arg s: the list to store previous n sk values
+    :arg y: the list to store previous n yk values
+    :arg n: the history size of rho, s, y
+    """
+
+    # Annotate the tape and compute the gradient
+    J_, u_ = forward_run(m, u, **params.model_options)
+    dJ_ = fd_adj.compute_gradient(J_, fd_adj.Control(u_))
+    yield {"J": J_, "u": u_.copy(deepcopy=True), "dJ": dJ_.copy(deepcopy=True)}
+
+    if s is None or y is None or rho is None:
+        rho = []
+        s = []
+        y = []
+
+    # Update the descent direction P
+    n_ = len(s)
+    q = dJ_.copy(deepcopy=True)
+    if n_ == 0:
+        H = Matrix(dJ_.function_space())
+        P = H.multiply(q)
+    else:
+        a = np.empty((n_,))
+        for i in range(n_ - 1, -1, -1):
+            a[i] = rho[i] * dotproduct(s[-1], q)
+            q -= a[i] * y[i]
+        H = Matrix(dJ_.function_space()).scale(dotproduct(s[-1], y[-1])/dotproduct(y[-1], y[-1]))
+        P = H.multiply(q)
+        for i in range(n_):
+            b = rho[i] * dotproduct(y[-1], P)
+            P += s[i] * (a[i] - b)
+    P = Matrix(dJ_.function_space()).scale(-1).multiply(P)
+
+    # Take a step downhill
+    lr = line_search(forward_run, m, u_, P, J_, dJ_, params)
+    u = u_ + lr * P
+
+    J, u = forward_run(m, u, **params.model_options)
+    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    sk = u.copy(deepcopy=True)
+    sk -= u_
+    yk = dJ.copy(deepcopy=True)
+    yk -= dJ_
+
+    # Update three lists
+    if dotproduct(sk, yk) > 0:
+        s.append(sk)
+        y.append(yk)
+        rho.append(1.0 / dotproduct(sk, yk))
+    if len(s) > n:
+        rho.pop(0)
+        s.pop(0)
+        y.pop(0)
+
+    yield {"lr": lr, "u+": u, "rho": rho, "s": s, "y": y}
 
 
 def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
@@ -214,8 +360,8 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
     lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
 
-    # Update Hessian approximation
-    if (u_ is not None) and (dJ_ is not None):
+    # Update the approximated inverted Hessian matrix
+    if u_ is not None and dJ_ is not None:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
 
@@ -224,23 +370,22 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
         y = dJ.copy(deepcopy=True)
         y -= dJ_
 
-        y_star_s = np.dot(y.dat.data, s.dat.data)
+        y_star_s = dotproduct(y, s)
         y_y_star = OuterProductMatrix(y, y)
         second_term = y_y_star.scale(1 / y_star_s)
 
         Bs = B.multiply(s)
-        sBs = np.dot(s.dat.data, Bs.dat.data)
+        sBs = dotproduct(s, Bs)
         sB = B.multiply(s, side="left")
         BssB = OuterProductMatrix(Bs, sB)
         third_term = BssB.scale(1 / sBs)
 
         B.add(second_term)
         B.subtract(third_term)
+    yield {"lr": lr, "u+": u, "B": B}
 
-    yield {"lr": lr, "u+": u, "u-": u_, "dJ-": dJ_, "ddJ": B}
 
-
-def _newton(it, forward_run, m, params, u, u_, dJ_, ddJ):
+def _newton(it, forward_run, m, params, u):
     """
     Take one full Newton iteration.
 
@@ -253,10 +398,9 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, ddJ):
         containing parameters for the optimisation and
         adaptation routines
     :arg u: the current control value
-    :arg u_: the previous control value (unused)
-    :arg dJ_: the previous gradient value (unused)
-    :arg ddJ: the previous Hessian value (unused)
     """
+
+    # Annotate the tape and compute the gradient
     J, u = forward_run(m, u, **params.model_options)
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     ddJ = compute_full_hessian(J, fd_adj.Control(u))
@@ -267,9 +411,10 @@ def _newton(it, forward_run, m, params, u, u_, dJ_, ddJ):
     except np.linalg.LinAlgError:
         raise Exception("Hessian is singular, please try the other methods")
 
+    # Take a step downhill
     lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
-    yield {"lr": lr, "u+": u, "u-": None, "dJ-": None, "ddJ": ddJ}
+    yield {"lr": lr, "u+": u, "ddJ": ddJ}
 
 
 _implemented_methods = {
@@ -279,7 +424,9 @@ _implemented_methods = {
         "type": "gradient_based",
     },
     "bfgs": {"func": _bfgs, "order": 2, "type": "quasi_newton"},
+    "lbfgs": {"func": _bfgs, "order": 2, "type": "quasi_newton"},
     "newton": {"func": _newton, "order": 2, "type": "newton"},
+    "adam": {"func": _adam, "order": 1, "type": "gradient_based"},
 }
 
 
@@ -341,22 +488,37 @@ def minimise(
     params = kwargs.get("params", OptAdaptParameters(method))
     op = kwargs.get("op", OptimisationProgress())
     dJ_init = None
-    ddJ = None
     target = params.target_base
+    ddJ = None
+    mesh_adaptation = adapt_fn != identity_mesh
 
     # Enter the optimisation loop
-    nc_ = mesh.num_cells()
+    nc = mesh.num_cells()
     adaptor = adapt_fn
-    mesh_conv_it = []
     for it in range(1, params.maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
         dJ_ = None if it == 1 else op.dJ_progress[-1]
-        ddJ_ = None if it == 1 or order == 1 else op.ddJ_progress[-1]
-        if order == 1:
-            args = (u_plus, u_, dJ_)
-        elif order == 2:
-            args = (u_plus, u_, dJ_, ddJ_)
+
+        if step == _gradient_descent:
+            args = [u_plus, u_, dJ_]
+        elif step == _adam:
+            if it == 1:
+                a_ = None
+                b_ = None
+            args = [u_plus, a_, b_]
+        elif step == _bfgs:
+            if it == 1:
+                B = None
+            args = [u_plus, u_, dJ_, B]
+        elif step == _lbfgs:
+            if it == 1:
+                rho = None
+                s = None
+                y = None
+            args = [u_plus, rho, s, y]
+        elif step == _newton:
+            args = [u_plus]
         else:
             raise NotImplementedError(f"Method {method} unavailable")
 
@@ -366,8 +528,14 @@ def minimise(
         for o in step(it, forward_run, mesh, params, *args):
             out.update(o)
         J, u, dJ = out["J"], out["u"], out["dJ"]
-        lr, u_plus, u_, dJ_ = out["lr"], out["u+"], out["u-"], out["dJ-"]
-        if order > 1:
+        lr, u_plus = out["lr"], out["u+"]
+        if step == _adam:
+            a_, b_ = out["a-"], out["b-"]
+        elif step == _bfgs:
+            B = out["B"]
+        elif step == _lbfgs:
+            rho, s, y = out["rho"], out["s"], out["y"]
+        elif step == _newton:
             ddJ = out["ddJ"]
 
         # Print to screen, if requested
@@ -382,7 +550,7 @@ def minimise(
             else:
                 msgs.append(f"||dJdm|| = {g:9.4e}")
             msgs.append(f"step length = {lr:9.4e}")
-            msgs.append(f"#elements = {nc_:5d}")
+            msgs.append(f"#elements = {nc:5d}")
             msgs.append(f"time = {t:.2f}s")
             pprint(",  ".join(msgs))
 
@@ -392,6 +560,11 @@ def minimise(
         op.dJ_progress.append(dJ)
         if ddJ is not None:
             op.ddJ_progress.append(ddJ)
+
+        # If lr is too small, the difference u-u_ will be 0, and it may cause error
+        if params.check_lr:
+            if lr < params.lr_lowerbound:
+                raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
@@ -404,49 +577,49 @@ def minimise(
             if params.disp > 0:
                 pprint(term_msg + "gtol convergence")
             break
+        # For some situation, convergence should be true, but don't satisfy the above condition
+        elif np.abs(J - op.J_progress[-2]) < params.qoi_rtol * op.J_progress[-2]:
+            if fd.norm(dJ) / dJ_init < params.gtol_loose:
+                if params.disp > 0:
+                    pprint(term_msg + "gtol convergence (second situation)")
+                break
 
         # Check for reaching maximum iteration count
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
-        # Ramp up the target complexity
-        target = min(target + params.target_inc, params.target_max)
-
-        # Adapt the mesh
-        mesh = adaptor(mesh, target=target, control=u_plus)
-        nc = mesh.num_cells()
-
-        # Check for mesh convergence
-        if adaptor != identity_mesh and np.abs(nc - nc_) < params.element_rtol * nc_:
-            conv = np.array([op.J_progress[i] for i in mesh_conv_it])
-            if (np.abs(J - conv) < params.qoi_rtol * np.abs(conv)).any():
-                pprint(term_msg + "qoi_rtol convergence")
-                break
-            mesh_conv_it.append(it)
-            if params.disp > 1:
-                pprint("NOTE: turning adaptation off due to element_rtol convergence")
-            adaptor = identity_mesh
-            continue
-        else:
-            adaptor = adapt_fn
-        nc_ = nc
-
-        # Check for QoI convergence
-        if it > 1:
+        if it > 2 and mesh_adaptation:
             J_ = op.J_progress[-2]
-            if np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
-                if adaptor != identity_mesh:
-                    conv = np.array([op.J_progress[i] for i in mesh_conv_it])
-                    if (np.abs(J - conv) < params.qoi_rtol * np.abs(conv)).any():
-                        pprint(term_msg + "qoi_rtol convergence")
-                        break
-                mesh_conv_it.append(it)
+            if nc < nc_:
+                mesh_adaptation = False
+                adaptor = identity_mesh
+                if params.disp > 1:
+                    pprint("NOTE: turning adaptation off due to mesh converged")
+                continue
+            elif np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
+                mesh_adaptation = False
+                adaptor = identity_mesh
                 if params.disp > 1:
                     pprint("NOTE: turning adaptation off due to qoi_rtol convergence")
+                continue
+            elif np.abs(nc - nc_) < params.element_rtol * nc_:
+                mesh_adaptation = False
                 adaptor = identity_mesh
+                if params.disp > 1:
+                    pprint("NOTE: turning adaptation off due to element_rtol convergence")
                 continue
             else:
                 adaptor = adapt_fn
+
+        if mesh_adaptation:
+            # Ramp up the target complexity
+            target = min(target + params.target_inc, params.target_max)
+            # Adapt the mesh
+            mesh = adaptor(mesh, target=target, control=u_plus)
+
+            nc_ = nc
+            nc = mesh.num_cells()
+
 
         # Clean up
         tape.clear_tape()

@@ -23,17 +23,28 @@ parser.add_argument("--target", type=float, default=1000.0)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
+parser.add_argument("--lr_lowerbound", type=float, default=1e-8)
+parser.add_argument("--check_lr", type=float, default=None)
 parser.add_argument("--disp", type=int, default=2)
+parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
 demo = args.demo
 method = args.method
 n = args.n
 target = args.target
+
+# Setup initial mesh
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
+
+# Setup parameter class
 params = OptAdaptParameters(
     method,
     options={
         "disp": args.disp,
         "lr": args.lr,
+        "lr_lowerbound": args.lr_lowerbound,
+        "check_lr": args.lr,
         "gtol": args.gtol,
         "maxiter": args.maxiter,
         "target_base": 0.2 * target,
@@ -44,6 +55,7 @@ params = OptAdaptParameters(
             "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
         },
     },
+    Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
 )
 pyrint(f"Using method {method}")
 
@@ -52,7 +64,6 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     """
     Adapt the mesh w.r.t. the intersection of the Hessians of
     each component of velocity and pressure.
-
     :kwarg target: Desired metric complexity (continuous
         analogue of mesh vertex count).
     :kwarg norm_order: Normalisation order :math:`p` for the
@@ -68,12 +79,10 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     return newmesh
 
 
-setup = importlib.import_module(f"{demo}.setup")
-mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
-try:
+if args.debug:
     m_opt = minimise(
         setup.forward_run,
         mesh,
@@ -84,12 +93,25 @@ try:
         op=op,
     )
     cpu_time = perf_counter() - cpu_timestamp
-    print(f"Hessian-based optimisation completed in {cpu_time:.2f}s")
-except Exception as exc:
-    cpu_time = perf_counter() - cpu_timestamp
-    print(f"Hessian-based optimisation failed after {cpu_time:.2f}s")
-    print(f"Reason: {exc}")
-    failed = True
+    print(f"Uniform optimisation completed in {cpu_time:.2f}s")
+else:
+    try:
+        m_opt = minimise(
+            setup.forward_run,
+            mesh,
+            setup.initial_control,
+            adapt_fn=adapt_hessian_based,
+            method=method,
+            params=params,
+            op=op,
+        )
+        cpu_time = perf_counter() - cpu_timestamp
+        print(f"Hessian-based optimisation completed in {cpu_time:.2f}s")
+    except Exception as exc:
+        cpu_time = perf_counter() - cpu_timestamp
+        print(f"Hessian-based optimisation failed after {cpu_time:.2f}s")
+        print(f"Reason: {exc}")
+        failed = True
 create_directory(f"{demo}/data")
 m = np.array([m.dat.data[0] for m in op.m_progress]).flatten()
 J = op.J_progress

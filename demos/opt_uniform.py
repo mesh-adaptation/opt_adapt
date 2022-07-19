@@ -19,17 +19,27 @@ parser.add_argument("--n", type=int, default=1)
 parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
+parser.add_argument("--lr_lowerbound", type=float, default=1e-8)
+parser.add_argument("--check_lr", type=float, default=None)
 parser.add_argument("--disp", type=int, default=1)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
 demo = args.demo
 method = args.method
 n = args.n
+
+# Setup initial mesh
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
+
+# Setup parameter class
 params = OptAdaptParameters(
     method,
     options={
         "disp": args.disp,
         "lr": args.lr,
+        "lr_lowerbound": args.lr_lowerbound,
+        "check_lr": args.lr,
         "maxiter": args.maxiter,
         "gtol": args.gtol,
         "model_options": {
@@ -37,11 +47,11 @@ params = OptAdaptParameters(
             "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
         },
     },
+    Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
 )
 pyrint(f"Using method {method}")
 
-setup = importlib.import_module(f"{demo}.setup")
-mesh = setup.initial_mesh(n=n)
+
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
