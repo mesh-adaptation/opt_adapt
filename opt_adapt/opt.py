@@ -91,7 +91,7 @@ class OptAdaptParameters:
         self.qoi_rtol = 0.005  # QoI relative tolerance
 
         """
-        Parameters lbfgs
+        Parameters of Adam
         """ 
         self.beta_1 = 0.9
         self.beta_2 = 0.999
