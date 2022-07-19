@@ -63,17 +63,29 @@ class OptAdaptParameters:
         lr = options.pop("lr", None)
         if lr is not None:
             self.lr = lr
-        elif "newton" in _implemented_methods[method]["type"]:
-            self.lr = 1.0
-        else:
+        elif method == "gradient_descent":
             self.lr = 0.001
+        else:
+            self.lr = 0.1
         self.lr_lowerbound = 1e-8
+
+        """
+        Whether needs to check lr
+        """
+        check_lr = options.pop("check_lr", None)
+        if lr is not None:
+            self.check_lr = check_lr
+        elif "quasi_newton" in _implemented_methods[method]["type"]:
+            self.check_lr = True
+        else:
+            self.check_lr = False
 
         """
         Parameters for combined optimisation-adaptation routine
         """
         self.maxiter = 101  # Maximum iteration count
         self.gtol = 1.0e-05  # Gradient relative tolerance
+        self.gtol_loose = 1.0e-03 
         self.dtol = 1.0001  # Divergence tolerance i.e. 0.01% increase
         self.element_rtol = 0.005  # Element count relative tolerance
         self.qoi_rtol = 0.005  # QoI relative tolerance
@@ -98,6 +110,13 @@ class OptAdaptParameters:
             if not hasattr(self, key):
                 raise ValueError(f"Option {key} not recognised")
             self.__setattr__(key, value)
+
+
+def dotproduct(f, g):
+    """
+    The dotproduct of two varaible in the same functionspace.
+    """
+    return np.dot(f.dat.data, g.dat.data)
 
 
 def line_search(forward_run, m, u, P, J, dJ, params):
@@ -127,7 +146,7 @@ def line_search(forward_run, m, u, P, J, dJ, params):
     disp = params.disp
 
     # Compute initial slope
-    initial_slope = np.dot(dJ.dat.data, P.dat.data)
+    initial_slope = dotproduct(dJ, P)
     if np.isclose(initial_slope, 0.0):
         return params.lr
 
@@ -151,10 +170,6 @@ def line_search(forward_run, m, u, P, J, dJ, params):
     if disp > 0:
         pprint(f"  converged lr = {lr:.4e}")
     return lr
-
-
-def dotproduct(f, g):
-    return np.dot(f.dat.data, g.dat.data)
 
 
 def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
@@ -193,7 +208,7 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     yield {"lr": lr, "u+": u}
 
 
-def _adam(it, forward_run, m, params, u, a_, b_, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def _adam(it, forward_run, m, params, u, a_, b_):
     """
     Take one Adam iteration.
 
@@ -209,7 +224,11 @@ def _adam(it, forward_run, m, params, u, a_, b_, beta_1=0.9, beta_2=0.999, epsil
     :arg a_: the previous first moment variable value
     :arg b_: the previous second moment variable value
     """
+
     lr = params.lr
+    beta_1=0.9
+    beta_2=0.999
+    epsilon=1e-8
 
     # Annotate the tape and compute the gradient
     J, u = forward_run(m, u, **params.model_options)
@@ -295,7 +314,7 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
     yk -= dJ_
 
     # Update three lists
-    if np.dot(sk.dat.data, yk.dat.data) > 0:
+    if dotproduct(sk, yk) > 0:
         s.append(sk)
         y.append(yk)
         rho.append(1.0 / dotproduct(sk, yk))
@@ -388,7 +407,7 @@ def _newton(it, forward_run, m, params, u):
     # Take a step downhill
     lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
-    yield {"lr": lr, "u+": u}
+    yield {"lr": lr, "u+": u, "ddJ": ddJ}
 
 
 _implemented_methods = {
@@ -463,7 +482,7 @@ def minimise(
     op = kwargs.get("op", OptimisationProgress())
     dJ_init = None
     target = params.target_base
-    B = None
+    ddJ = None
     mesh_adaptation = adapt_fn != identity_mesh
 
     # Enter the optimisation loop
@@ -509,6 +528,8 @@ def minimise(
             B = out["B"]
         elif step == _lbfgs:
             rho, s, y = out["rho"], out["s"], out["y"]
+        elif step == _newton:
+            ddJ = out["ddJ"]
 
         # Print to screen, if requested
         if params.disp > 0:
@@ -530,11 +551,11 @@ def minimise(
         op.J_progress.append(J)
         op.m_progress.append(u)
         op.dJ_progress.append(dJ)
-        if B is not None:
-            op.ddJ_progress.append(B)
+        if ddJ is not None:
+            op.ddJ_progress.append(ddJ)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        if step == _bfgs or step == _lbfgs:
+        if params.check_lr:
             if lr < params.lr_lowerbound:
                 raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
 
@@ -551,7 +572,7 @@ def minimise(
             break
         # For some situation, convergence should be true, but don't satisfy the above condition
         elif np.abs(J - op.J_progress[-2]) < params.qoi_rtol * op.J_progress[-2]:
-            if fd.norm(dJ) / dJ_init < 1e-3:
+            if fd.norm(dJ) / dJ_init < params.gtol_loose:
                 if params.disp > 0:
                     pprint(term_msg + "gtol convergence (second situation)")
                 break
