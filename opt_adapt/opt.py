@@ -209,6 +209,7 @@ def _adam(it, forward_run, m, params, u, a_, b_, beta_1=0.9, beta_2=0.999, epsil
     :arg a_: the previous first moment variable value
     :arg b_: the previous second moment variable value
     """
+    lr = params.lr
 
     # Annotate the tape and compute the gradient
     J, u = forward_run(m, u, **params.model_options)
@@ -228,7 +229,7 @@ def _adam(it, forward_run, m, params, u, a_, b_, beta_1=0.9, beta_2=0.999, epsil
     b_hat = fd.Function(dJ).assign(b / (1 - pow(beta_2, it)))
     P = fd.Function(dJ).assign(-1 * a_hat / (pow(b_hat, 0.5) + epsilon))
 
-    # Find step length and take a step downhill
+    # Take a step downhill
     lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
 
@@ -461,7 +462,6 @@ def minimise(
     params = kwargs.get("params", OptAdaptParameters(method))
     op = kwargs.get("op", OptimisationProgress())
     dJ_init = None
-    ddJ = None
     target = params.target_base
     B = None
     mesh_adaptation = adapt_fn != identity_mesh
@@ -472,8 +472,7 @@ def minimise(
     for it in range(1, params.maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
-        dJ_ = None if it == 1 else op.dJdm_progress[-1]
-        ddJ_ = None if it == 1 or order == 1 else op.ddJ_progress[-1]
+        dJ_ = None if it == 1 else op.dJ_progress[-1]
 
         if step == _gradient_descent:
             args = [u_plus, u_, dJ_]
@@ -531,11 +530,11 @@ def minimise(
         op.J_progress.append(J)
         op.m_progress.append(u)
         op.dJ_progress.append(dJ)
-        if ddJ is not None:
-            op.ddJ_progress.append(ddJ)
+        if B is not None:
+            op.ddJ_progress.append(B)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        if step == _BFGS or step == _LBFGS:
+        if step == _bfgs or step == _lbfgs:
             if lr < params.lr_lowerbound:
                 raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
 

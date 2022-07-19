@@ -1,4 +1,3 @@
-from opt_adapt.opt import _LBFGS
 from pyroteus.log import pyrint
 from pyroteus.utility import create_directory, File
 from opt_adapt.opt import *
