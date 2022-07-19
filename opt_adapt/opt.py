@@ -193,19 +193,7 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     yield {"lr": lr, "u+": u}
 
 
-def _adam(
-    it,
-    forward_run,
-    m,
-    params,
-    u,
-    a_,
-    b_,
-    Rspace=False,
-    beta_1=0.9,
-    beta_2=0.999,
-    epsilon=1e-8,
-):
+def _adam(it, forward_run, m, params, u, a_, b_, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     """
     Take one Adam iteration.
 
@@ -220,8 +208,6 @@ def _adam(
     :arg u: the current control value
     :arg a_: the previous first moment variable value
     :arg b_: the previous second moment variable value
-    :kwarg Rspace: is the prognostic function
-        space of type 'Real'?
     """
 
     # Annotate the tape and compute the gradient
@@ -234,34 +220,22 @@ def _adam(
         b_ = fd.Function(dJ.function_space())
 
     # Find the descent direction
-    if Rspace:
-        dJ_square = fd.Function(dJ).assign(pow(float(dJ), 2))
-        a = fd.Function(dJ).assign(beta_1 * a_ + (1 - beta_1) * dJ)
-        b = fd.Function(dJ).assign(beta_2 * b_ + (1 - beta_2) * dJ_square)
-        a_hat = fd.Function(dJ).assign(a / (1 - pow(beta_1, it)))
-        b_hat = fd.Function(dJ).assign(b / (1 - pow(beta_2, it)))
-        P = fd.Function(dJ).assign(-1 * a_hat / (pow(b_hat, 0.5) + epsilon))
-    else:
-        # TODO: Avoid transferring UFL expressions
-        dJ_square = params.transfer_fn(dJ * dJ, dJ.function_space())
-        a = params.transfer_fn(beta_1 * a_ + (1 - beta_1) * dJ, dJ.function_space())
-        b = params.transfer_fn(
-            beta_2 * b_ + (1 - beta_2) * dJ_square, dJ.function_space()
-        )
-        a_hat = params.transfer_fn(a / (1 - pow(beta_1, it)), dJ.function_space())
-        b_hat = params.transfer_fn(b / (1 - pow(beta_2, it)), dJ.function_space())
-        P = params.transfer_fn(
-            -1 * a_hat / (pow(b_hat, 0.5) + epsilon), dJ.function_space()
-        )
+    dJ_square = fd.Function(dJ)
+    dJ_square *= dJ
+    a = fd.Function(dJ).assign(beta_1 * a_ + (1 - beta_1) * dJ)
+    b = fd.Function(dJ).assign(beta_2 * b_ + (1 - beta_2) * dJ_square)
+    a_hat = fd.Function(dJ).assign(a / (1 - pow(beta_1, it)))
+    b_hat = fd.Function(dJ).assign(b / (1 - pow(beta_2, it)))
+    P = fd.Function(dJ).assign(-1 * a_hat / (pow(b_hat, 0.5) + epsilon))
 
     # Find step length and take a step downhill
-    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+    lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
 
     yield {"lr": lr, "u+": u, "a-": a, "b-": b}
 
 
-def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
+def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
     """
     Take one L-BFGS iteration.
 
@@ -278,8 +252,6 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     :arg s: the list to store previous n sk values
     :arg y: the list to store previous n yk values
     :arg n: the history size of rho, s, y
-    :kwarg Rspace: is the prognostic function
-        space of type 'Real'?
     """
 
     # Annotate the tape and compute the gradient
@@ -311,7 +283,7 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5, Rspace=False):
     P = Matrix(dJ_.function_space()).scale(-1).multiply(P)
 
     # Take a step downhill
-    lr = line_search(forward_run, m, u_, P, J_, dJ_, params, Rspace)
+    lr = line_search(forward_run, m, u_, P, J_, dJ_, params)
     u = u_ + lr * P
 
     J, u = forward_run(m, u, **params.model_options)
@@ -361,57 +333,29 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
     lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
 
-    # Update Hessian approximation
-    if (u_ is not None) and (dJ_ is not None):
+    # Update the approximated inverted Hessian matrix
+    if u_ is not None and dJ_ is not None:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
 
-    if Rspace:
-        if u_ is None or dJ_ is None:
-            B = 1
-        else:
-            dJ_ = fd.Function(dJ).assign(dJ_)
-            u_ = fd.Function(u).assign(u_)
-            s = float(u) - float(u_)
-            y = float(dJ) - float(dJ_)
-            B = y / s
-        P = -float(dJ) / B
-        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
-        u += lr * P
-        yield {"lr": lr, "u+": u, "B": B}
+        s = u.copy(deepcopy=True)
+        s -= u_
+        y = dJ.copy(deepcopy=True)
+        y -= dJ_
 
-    else:
-        if B is None:
-            B = Matrix(u.function_space())
-        
-        # Take a step downhill
-        P = B.scale(-1).solve(dJ)
-        lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
-        u += lr * P
-        
-        # Update the approximated inverted Hessian matrix
-        if u_ is not None and dJ_ is not None:
-            dJ_ = params.transfer_fn(dJ_, dJ.function_space())
-            u_ = params.transfer_fn(u_, u.function_space())
+        y_star_s = dotproduct(y, s)
+        y_y_star = OuterProductMatrix(y, y)
+        second_term = y_y_star.scale(1 / y_star_s)
 
-            s = u.copy(deepcopy=True)
-            s -= u_
-            y = dJ.copy(deepcopy=True)
-            y -= dJ_
+        Bs = B.multiply(s)
+        sBs = dotproduct(s, Bs)
+        sB = B.multiply(s, side="left")
+        BssB = OuterProductMatrix(Bs, sB)
+        third_term = BssB.scale(1 / sBs)
 
-            y_star_s = dotproduct(y, s)
-            y_y_star = OuterProductMatrix(y, y)
-            second_term = y_y_star.scale(1 / y_star_s)
-
-            Bs = B.multiply(s)
-            sBs = dotproduct(s, Bs)
-            sB = B.multiply(s, side="left")
-            BssB = OuterProductMatrix(Bs, sB)
-            third_term = BssB.scale(1 / sBs)
-
-            B.add(second_term)
-            B.subtract(third_term)
-        yield {"lr": lr, "u+": u, "B": B}
+        B.add(second_term)
+        B.subtract(third_term)
+    yield {"lr": lr, "u+": u, "B": B}
 
 
 def _newton(it, forward_run, m, params, u):
@@ -440,11 +384,8 @@ def _newton(it, forward_run, m, params, u):
     except np.linalg.LinAlgError:
         raise Exception("Hessian is singular, please try the other methods")
 
-    lr = line_search(forward_run, m, u, P, J, dJ, params)
-    u += lr * P
-
     # Take a step downhill
-    lr = line_search(forward_run, m, u, P, J, dJ, params, Rspace)
+    lr = line_search(forward_run, m, u, P, J, dJ, params)
     u += lr * P
     yield {"lr": lr, "u+": u}
 
