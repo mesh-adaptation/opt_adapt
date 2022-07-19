@@ -37,6 +37,12 @@ model_options = {
     "no_exports": True,
     "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
 }
+
+# Setup initial mesh
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
+
+# Setup parameter class
 params = OptAdaptParameters(
     method,
     options={
@@ -49,6 +55,7 @@ params = OptAdaptParameters(
         "target_max": target,
         "model_options": model_options,
     },
+    Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
 )
 pyrint(f"Using method {method}")
 
@@ -114,8 +121,6 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     return newmesh
 
 
-setup = importlib.import_module(f"{demo}.setup")
-mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False

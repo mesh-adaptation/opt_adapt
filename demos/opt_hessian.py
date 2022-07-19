@@ -29,6 +29,12 @@ demo = args.demo
 method = args.method
 n = args.n
 target = args.target
+
+# Setup initial mesh
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
+
+# Setup parameter class
 params = OptAdaptParameters(
     method,
     options={
@@ -44,6 +50,7 @@ params = OptAdaptParameters(
             "outfile": File(f"{demo}/outputs_hessian/solution.pvd", adaptive=True),
         },
     },
+    Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
 )
 pyrint(f"Using method {method}")
 
@@ -67,8 +74,6 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     return newmesh
 
 
-setup = importlib.import_module(f"{demo}.setup")
-mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False

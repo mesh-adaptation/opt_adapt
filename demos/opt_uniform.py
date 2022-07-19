@@ -27,6 +27,12 @@ args = parser.parse_args()
 demo = args.demo
 method = args.method
 n = args.n
+
+# Setup initial mesh
+setup = importlib.import_module(f"{demo}.setup")
+mesh = setup.initial_mesh(n=n)
+
+# Setup parameter class
 params = OptAdaptParameters(
     method,
     options={
@@ -40,12 +46,11 @@ params = OptAdaptParameters(
             "outfile": File(f"{demo}/outputs_uniform/solution.pvd", adaptive=True),
         },
     },
+    Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
 )
 pyrint(f"Using method {method}")
 
 
-setup = importlib.import_module(f"{demo}.setup")
-mesh = setup.initial_mesh(n=n)
 cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
