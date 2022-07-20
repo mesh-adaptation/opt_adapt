@@ -489,7 +489,7 @@ def minimise(
     op = kwargs.get("op", OptimisationProgress())
     dJ_init = None
     target = params.target_base
-    ddJ = None
+    B = None
     mesh_adaptation = adapt_fn != identity_mesh
 
     # Enter the optimisation loop
@@ -536,7 +536,7 @@ def minimise(
         elif step == _lbfgs:
             rho, s, y = out["rho"], out["s"], out["y"]
         elif step == _newton:
-            ddJ = out["ddJ"]
+            B = out["ddJ"]
 
         # Print to screen, if requested
         if params.disp > 0:
@@ -558,8 +558,8 @@ def minimise(
         op.J_progress.append(J)
         op.m_progress.append(u)
         op.dJ_progress.append(dJ)
-        if ddJ is not None:
-            op.ddJ_progress.append(ddJ)
+        if B is not None:
+            op.ddJ_progress.append(B)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
         if params.check_lr:
