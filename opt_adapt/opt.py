@@ -304,7 +304,9 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
         for i in range(n_ - 1, -1, -1):
             a[i] = rho[i] * dotproduct(s[-1], q)
             q -= a[i] * y[i]
-        H = Matrix(dJ_.function_space()).scale(dotproduct(s[-1], y[-1])/dotproduct(y[-1], y[-1]))
+        H = Matrix(dJ_.function_space()).scale(
+            dotproduct(s[-1], y[-1]) / dotproduct(y[-1], y[-1])
+        )
         P = H.multiply(q)
         for i in range(n_):
             b = rho[i] * dotproduct(y[-1], P)
@@ -568,7 +570,9 @@ def minimise(
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
         if params.check_lr:
             if lr < params.lr_lowerbound:
-                raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
+                raise fd.ConvergenceError(
+                    term_msg + "fail, because control variable didn't move"
+                )
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
@@ -610,7 +614,9 @@ def minimise(
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
-                    pprint("NOTE: turning adaptation off due to element_rtol convergence")
+                    pprint(
+                        "NOTE: turning adaptation off due to element_rtol convergence"
+                    )
                 continue
             else:
                 adaptor = adapt_fn
@@ -623,7 +629,6 @@ def minimise(
 
             nc_ = nc
             nc = mesh.num_cells()
-
 
         # Clean up
         tape.clear_tape()

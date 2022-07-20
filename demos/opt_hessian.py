@@ -52,7 +52,9 @@ params = OptAdaptParameters(
         "target_max": target,
         "model_options": {
             "no_exports": True,
-            "outfile": File(f"{demo}/outputs_hessian/{method}/solution.pvd", adaptive=True),
+            "outfile": File(
+                f"{demo}/outputs_hessian/{method}/solution.pvd", adaptive=True
+            ),
         },
     },
     Rspace=setup.initial_control(mesh).ufl_element().family() == "Real",
