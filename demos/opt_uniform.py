@@ -39,7 +39,7 @@ params = OptAdaptParameters(
         "disp": args.disp,
         "lr": args.lr,
         "lr_lowerbound": args.lr_lowerbound,
-        "check_lr": args.lr,
+        "check_lr": args.check_lr,
         "maxiter": args.maxiter,
         "gtol": args.gtol,
         "model_options": {
