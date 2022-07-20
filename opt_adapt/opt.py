@@ -28,6 +28,7 @@ class OptimisationProgress:
         self.m_progress = []
         self.dJ_progress = []
         self.ddJ_progress = []
+        self.nc_progress = []
 
 
 class OptAdaptParameters:
@@ -560,6 +561,7 @@ def minimise(
         op.dJ_progress.append(dJ)
         if B is not None:
             op.ddJ_progress.append(B)
+        op.nc_progress.append(nc)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
         if params.check_lr:
