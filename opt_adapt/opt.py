@@ -632,4 +632,4 @@ def minimise(
 
         # Clean up
         tape.clear_tape()
-    return u_plus
+    return u_plus, mesh
