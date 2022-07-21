@@ -20,9 +20,6 @@ plot_dir = create_directory(f"{demo}/plot_different_optimization_method")
 
 fig, axes = plt.subplots()
 for method in _implemented_methods:
-<<<<<<< Updated upstream:demos/plot_convergence.py
-    J = np.load(f"{demo}/data/uniform_progress_J_{n}_{method}.npy")
-=======
     J = np.load(f"{demo}/data/{run}_progress_J_{n}_{method}.npy")
     t = np.load(f"{demo}/data/{run}_progress_t_{n}_{method}.npy")
     times = [sum(t[:i]) for i in range(len(t))]
@@ -38,7 +35,6 @@ plt.close()
 fig, axes = plt.subplots()
 for method in _implemented_methods:
     J = np.load(f"{demo}/data/{run}_progress_J_{n}_{method}.npy")
->>>>>>> Stashed changes:demos/plot_different_optimization_method.py
     it = np.array(range(len(J))) + 1
     axes.loglog(it, J, label=method)
 axes.grid(True)
