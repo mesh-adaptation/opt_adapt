@@ -28,7 +28,7 @@ parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
 parser.add_argument("--lr_lowerbound", type=float, default=1e-8)
-parser.add_argument("--check_lr", type=float, default=None)
+parser.add_argument("--check_lr", action="store_true")
 parser.add_argument("--disp", type=int, default=2)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
@@ -38,7 +38,7 @@ n = args.n
 target = args.target
 model_options = {
     "no_exports": True,
-    "outfile": File(f"{demo}/outputs_go/solution.pvd", adaptive=True),
+    "outfile": File(f"{demo}/outputs_go/{method}/solution.pvd", adaptive=True),
 }
 
 # Setup initial mesh
@@ -160,12 +160,16 @@ else:
         print(f"Reason: {exc}")
         failed = True
 create_directory(f"{demo}/data")
+t = op.t_progress
 m = np.array([m.dat.data[0] for m in op.m_progress]).flatten()
 J = op.J_progress
 dJ = np.array([dj.dat.data[0] for dj in op.dJ_progress]).flatten()
+nc = op.nc_progress
+np.save(f"{demo}/data/go_progress_t_{n}_{method}", t)
 np.save(f"{demo}/data/go_progress_m_{n}_{method}", m)
 np.save(f"{demo}/data/go_progress_J_{n}_{method}", J)
 np.save(f"{demo}/data/go_progress_dJ_{n}_{method}", dJ)
+np.save(f"{demo}/data/go_progress_nc_{n}_{method}", nc)
 with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")

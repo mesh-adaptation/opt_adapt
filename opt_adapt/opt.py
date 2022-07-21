@@ -24,10 +24,12 @@ class OptimisationProgress:
     """
 
     def __init__(self):
+        self.t_progress = []
         self.J_progress = []
         self.m_progress = []
         self.dJ_progress = []
         self.ddJ_progress = []
+        self.nc_progress = []
 
 
 class OptAdaptParameters:
@@ -85,14 +87,14 @@ class OptAdaptParameters:
         """
         self.maxiter = 101  # Maximum iteration count
         self.gtol = 1.0e-05  # Gradient relative tolerance
-        self.gtol_loose = 1.0e-03 
-        self.dtol = 1.0001  # Divergence tolerance i.e. 0.01% increase
+        self.gtol_loose = 1.0e-03
+        self.dtol = 1.01  # Divergence tolerance i.e. 1% increase
         self.element_rtol = 0.005  # Element count relative tolerance
         self.qoi_rtol = 0.005  # QoI relative tolerance
 
         """
         Parameters of Adam
-        """ 
+        """
         self.beta_1 = 0.9
         self.beta_2 = 0.999
         self.epsilon = 1e-8
@@ -302,7 +304,9 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
         for i in range(n_ - 1, -1, -1):
             a[i] = rho[i] * dotproduct(s[-1], q)
             q -= a[i] * y[i]
-        H = Matrix(dJ_.function_space()).scale(dotproduct(s[-1], y[-1])/dotproduct(y[-1], y[-1]))
+        H = Matrix(dJ_.function_space()).scale(
+            dotproduct(s[-1], y[-1]) / dotproduct(y[-1], y[-1])
+        )
         P = H.multiply(q)
         for i in range(n_):
             b = rho[i] * dotproduct(y[-1], P)
@@ -489,7 +493,7 @@ def minimise(
     op = kwargs.get("op", OptimisationProgress())
     dJ_init = None
     target = params.target_base
-    ddJ = None
+    B = None
     mesh_adaptation = adapt_fn != identity_mesh
 
     # Enter the optimisation loop
@@ -536,11 +540,11 @@ def minimise(
         elif step == _lbfgs:
             rho, s, y = out["rho"], out["s"], out["y"]
         elif step == _newton:
-            ddJ = out["ddJ"]
+            B = out["ddJ"]
 
         # Print to screen, if requested
+        t = perf_counter() - cpu_timestamp
         if params.disp > 0:
-            t = perf_counter() - cpu_timestamp
             g = dJ.dat.data[0] if Rspace else fd.norm(dJ)
             msgs = [f"{it:3d}:  J = {J:9.4e}"]
             if Rspace:
@@ -555,16 +559,20 @@ def minimise(
             pprint(",  ".join(msgs))
 
         # Stash progress
+        op.t_progress.append(t)
         op.J_progress.append(J)
         op.m_progress.append(u)
         op.dJ_progress.append(dJ)
-        if ddJ is not None:
-            op.ddJ_progress.append(ddJ)
+        if B is not None:
+            op.ddJ_progress.append(B)
+        op.nc_progress.append(nc)
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
         if params.check_lr:
             if lr < params.lr_lowerbound:
-                raise fd.ConvergenceError(term_msg + "fail, because control variable didn't move")
+                raise fd.ConvergenceError(
+                    term_msg + "fail, because control variable didn't move"
+                )
 
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
@@ -606,7 +614,9 @@ def minimise(
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
-                    pprint("NOTE: turning adaptation off due to element_rtol convergence")
+                    pprint(
+                        "NOTE: turning adaptation off due to element_rtol convergence"
+                    )
                 continue
             else:
                 adaptor = adapt_fn
@@ -619,7 +629,6 @@ def minimise(
 
             nc_ = nc
             nc = mesh.num_cells()
-
 
         # Clean up
         tape.clear_tape()
