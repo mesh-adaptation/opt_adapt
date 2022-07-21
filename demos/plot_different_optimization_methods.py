@@ -11,12 +11,15 @@ parser = argparse.ArgumentParser(
 )
 pwd = os.path.abspath(os.path.dirname(__file__))
 choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
+runs = ["uniform", "hessian", "go"]
 parser.add_argument("demo", type=str, choices=choices)
+parser.add_argument("--run", type=str, default="uniform", choices=runs)
 parser.add_argument("--n", type=int, default=1)
 args = parser.parse_args()
 demo = args.demo
+run = args.run
 n = args.n
-plot_dir = create_directory(f"{demo}/plot_different_optimization_method")
+plot_dir = create_directory(f"{demo}/plot_different_optimization_methods")
 
 fig, axes = plt.subplots()
 for method in _implemented_methods:
@@ -43,4 +46,5 @@ axes.set_xlabel("Iteration")
 axes.set_ylabel("Objective function value")
 axes.legend()
 plt.tight_layout()
-plt.savefig(f"{plot_dir}/convergence_{n}.png")
+plt.savefig(f"{plot_dir}/qoi_vs_it_{run}_{n}.png")
+plt.close()
