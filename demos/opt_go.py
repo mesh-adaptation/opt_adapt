@@ -13,6 +13,8 @@ import importlib
 import numpy as np
 import os
 from time import perf_counter
+import matplotlib.pyplot as plt
+
 
 
 parser = argparse.ArgumentParser(
@@ -130,7 +132,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 if args.debug:
-    m_opt = minimise(
+    m_opt, mesh_final = minimise(
         setup.forward_run,
         mesh,
         setup.initial_control,
@@ -143,7 +145,7 @@ if args.debug:
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 else:
     try:
-        m_opt = minimise(
+        m_opt, mesh_final = minimise(
             setup.forward_run,
             mesh,
             setup.initial_control,
@@ -173,3 +175,11 @@ np.save(f"{demo}/data/go_progress_nc_{n}_{method}", nc)
 with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
+
+plot_dir = create_directory(f"{demo}/plot_final_mesh")
+fig, axes = plt.subplots()
+triplot(mesh_final, axes=axes)
+axes.set_title(f"Final mesh of {demo} by {method} method with anistropical mesh adaptation")
+axes.legend()
+plt.tight_layout()
+plt.savefig(f"{plot_dir}/mesh_anistropical_{method}.png", bbox_inches = "tight")
