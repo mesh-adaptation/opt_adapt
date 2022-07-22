@@ -13,7 +13,7 @@ pwd = os.path.abspath(os.path.dirname(__file__))
 choices = [name for name in os.listdir(pwd) if os.path.isdir(name)]
 parser.add_argument("demo", type=str, choices=choices)
 parser.add_argument("--n", type=int, default=1)
-parser.add_argument("--method", type=str, choices=_implemented_methods)
+parser.add_argument("--method", type=str, choices=_implemented_methods.keys())
 args = parser.parse_args()
 demo = args.demo
 n = args.n

@@ -132,7 +132,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 if args.debug:
-    m_opt, mesh_final = minimise(
+    m_opt = minimise(
         setup.forward_run,
         mesh,
         setup.initial_control,
@@ -145,7 +145,7 @@ if args.debug:
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 else:
     try:
-        m_opt, mesh_final = minimise(
+        m_opt = minimise(
             setup.forward_run,
             mesh,
             setup.initial_control,
@@ -178,7 +178,7 @@ with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
 
 plot_dir = create_directory(f"{demo}/plots")
 fig, axes = plt.subplots()
-triplot(mesh_final, axes=axes)
+triplot(op.mesh_progress[-1], axes=axes)
 axes.legend()
 plt.tight_layout()
 plt.savefig(f"{plot_dir}/mesh_go_{method}.png")

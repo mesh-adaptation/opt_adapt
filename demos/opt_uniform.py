@@ -58,7 +58,7 @@ cpu_timestamp = perf_counter()
 op = OptimisationProgress()
 failed = False
 if args.debug:
-    m_opt, mesh_final = minimise(
+    m_opt = minimise(
         setup.forward_run,
         mesh,
         setup.initial_control,
@@ -70,7 +70,7 @@ if args.debug:
     print(f"Uniform optimisation completed in {cpu_time:.2f}s")
 else:
     try:
-        m_opt, mesh_final = minimise(
+        m_opt = minimise(
             setup.forward_run,
             mesh,
             setup.initial_control,

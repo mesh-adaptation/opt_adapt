@@ -567,7 +567,7 @@ def minimise(
         if B is not None:
             op.ddJ_progress.append(B)
         op.nc_progress.append(nc)
-        op.mesh_progress.append(mesh)
+        op.mesh_progress.append(fd.Mesh(mesh.coordinates.copy(deepcopy=True)))
 
         # If lr is too small, the difference u-u_ will be 0, and it may cause error
         if params.check_lr:
@@ -634,4 +634,4 @@ def minimise(
 
         # Clean up
         tape.clear_tape()
-    return u_plus, fd.Mesh(mesh.coordinates.copy(deepcopy=True))
+    return u_plus
