@@ -133,10 +133,9 @@ with open(f"{demo}/data/hessian_{target:.0f}_{method}.log", "w+") as f:
     f.write(f"cpu_time: {cpu_time}{note}\n")
 
 
-plot_dir = create_directory(f"{demo}/plot_final_mesh")
+plot_dir = create_directory(f"{demo}/plots")
 fig, axes = plt.subplots()
 triplot(mesh_final, axes=axes)
-axes.set_title(f"Final mesh of {demo} by {method} method with hessian based mesh adaptation")
 axes.legend()
 plt.tight_layout()
-plt.savefig(f"{plot_dir}/mesh_hessian_{method}.png", bbox_inches = "tight")
+plt.savefig(f"{plot_dir}/mesh_hessian_{method}.png")

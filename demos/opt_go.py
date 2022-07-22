@@ -176,10 +176,9 @@ with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
 
-plot_dir = create_directory(f"{demo}/plot_final_mesh")
+plot_dir = create_directory(f"{demo}/plots")
 fig, axes = plt.subplots()
 triplot(mesh_final, axes=axes)
-axes.set_title(f"Final mesh of {demo} by {method} method with anistropical mesh adaptation")
 axes.legend()
 plt.tight_layout()
-plt.savefig(f"{plot_dir}/mesh_anistropical_{method}.png", bbox_inches = "tight")
+plt.savefig(f"{plot_dir}/mesh_go_{method}.png")

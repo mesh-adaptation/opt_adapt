@@ -19,7 +19,7 @@ args = parser.parse_args()
 demo = args.demo
 run = args.run
 n = args.n
-plot_dir = create_directory(f"{demo}/plot_different_optimization_methods")
+plot_dir = create_directory(f"{demo}/plots")
 
 fig, axes = plt.subplots()
 for method in _implemented_methods:
@@ -28,7 +28,6 @@ for method in _implemented_methods:
     times = [sum(t[:i]) for i in range(len(t))]
     axes.loglog(times, J, label=method)
 axes.grid(True)
-axes.set_title(f"{demo} with mesh adaptation by opt_{run}.py")
 axes.set_xlabel("Cumulative CPU time (seconds)")
 axes.set_ylabel("Objective function value")
 axes.legend()
@@ -41,7 +40,6 @@ for method in _implemented_methods:
     it = np.array(range(len(J))) + 1
     axes.loglog(it, J, label=method)
 axes.grid(True)
-axes.set_title(f"{demo} with mesh adaptation by opt_{run}.py")
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Objective function value")
 axes.legend()
