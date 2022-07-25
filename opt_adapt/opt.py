@@ -204,17 +204,20 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
+    # Find the descent direction
+    P = dJ.copy(deepcopy=True)
+    P *= -1
+
     # Choose step length
-    if u_ is None or dJ_ is None:
-        lr = params.lr
-    else:
+    if u_ is not None and dJ_ is not None:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
         dJ_diff = fd.assemble(ufl.inner(dJ_ - dJ, dJ_ - dJ) * ufl.dx)
-        lr = abs(fd.assemble(ufl.inner(u_ - u, dJ_ - dJ) * ufl.dx) / dJ_diff)
+        params.lr = abs(fd.assemble(ufl.inner(u_ - u, dJ_ - dJ) * ufl.dx) / dJ_diff)
+    lr = line_search(forward_run, m, u, P, J, dJ, params)
 
     # Take a step downhill
-    u -= lr * dJ
+    u += lr * P
     yield {"lr": lr, "u+": u}
 
 
