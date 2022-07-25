@@ -89,7 +89,7 @@ class OptAdaptParameters:
         self.maxiter = 101  # Maximum iteration count
         self.gtol = 1.0e-05  # Gradient relative tolerance
         self.gtol_loose = 1.0e-03
-        self.dtol = 1.01  # Divergence tolerance i.e. 1% increase
+        self.dtol = 1.1  # Divergence tolerance i.e. increase by 10%
         self.element_rtol = 0.005  # Element count relative tolerance
         self.qoi_rtol = 0.005  # QoI relative tolerance
 
