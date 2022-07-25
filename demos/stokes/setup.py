@@ -50,12 +50,12 @@ def forward_run(mesh, control, **kwargs):
 
     w = Function(W)
     sp = {
-    "mat_type": "aij",  # Matrix type that we need to use a direct solver
-    "snes_monitor": None, # Print the nonlinear solver progress
-    "ksp_type": "preonly",  # Don't use a linear solver, just apply a preconditioner
-    "ksp_monitor": None,  # Print the linear solver progress
-    "pc_type": "lu",  # Use a full LU decomposition as a preconditioner
-    "pc_factor_mat_solver_type": "mumps",  # Use the MUMPS package to compute the LU decomposition
+        "mat_type": "aij",  # Matrix type that we need to use a direct solver
+        "snes_monitor": None, # Print the nonlinear solver progress
+        "ksp_type": "preonly",  # Don't use a linear solver, just apply a preconditioner
+        "ksp_monitor": None,  # Print the linear solver progress
+        "pc_type": "lu",  # Use a full LU decomposition as a preconditioner
+        "pc_factor_mat_solver_type": "mumps",  # Use the MUMPS package to compute the LU decomposition
     }
     solve(a == L, w, bcs=bcs, solver_parameters=sp)
     
