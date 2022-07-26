@@ -27,9 +27,8 @@ parser.add_argument("--maxiter", type=int, default=100)
 parser.add_argument("--dtol", type=float, default=10.0)
 parser.add_argument("--gtol", type=float, default=1.0e-05)
 parser.add_argument("--lr", type=float, default=None)
-parser.add_argument("--lr_lowerbound", type=float, default=1e-8)
-parser.add_argument("--check_lr", action="store_true")
-parser.add_argument("--disp", type=int, default=2)
+parser.add_argument("--lr_min", type=float, default=1e-8)
+parser.add_argument("--disp", type=int, default=1)
 parser.add_argument("--debug", action="store_true")
 args = parser.parse_args()
 demo = args.demo
@@ -47,9 +46,8 @@ params = OptAdaptParameters(
     options={
         "disp": args.disp,
         "lr": args.lr,
-        "lr_lowerbound": args.lr_lowerbound,
-        "check_lr": args.check_lr,
         "dtol": args.dtol,
+        "lr_min": args.lr_min,
         "gtol": args.gtol,
         "maxiter": args.maxiter,
         "target_base": 0.2 * target,

@@ -6,6 +6,8 @@ from firedrake.adjoint import get_solve_blocks
 import ufl
 import numpy as np
 from time import perf_counter
+import matplotlib.pyplot as plt
+from opt_adapt.utils import *
 
 
 __all__ = [
@@ -70,18 +72,7 @@ class OptAdaptParameters:
             self.lr = 0.001
         else:
             self.lr = 0.1
-        self.lr_lowerbound = 1e-8
-
-        """
-        Whether needs to check lr
-        """
-        check_lr = options.pop("check_lr", None)
-        if lr is not None:
-            self.check_lr = check_lr
-        elif "quasi_newton" in _implemented_methods[method]["type"]:
-            self.check_lr = True
-        else:
-            self.check_lr = False
+        self.lr_min = 1e-8
 
         """
         Parameters for combined optimisation-adaptation routine
@@ -161,11 +152,11 @@ def line_search(forward_run, m, u, P, J, dJ, params):
         return params.lr
 
     # Perform line search
-    if disp > 0:
+    if disp > 1:
         pprint(f"  Applying line search with alpha = {alpha} and tau = {tau}")
     ext = ""
     for i in range(maxiter):
-        if disp > 0:
+        if disp > 1:
             pprint(f"  {i:3d}:      lr = {lr:.4e}{ext}")
         u_plus = u + lr * P
         J_plus, u_plus = forward_run(m, u_plus)
@@ -175,9 +166,12 @@ def line_search(forward_run, m, u, P, J, dJ, params):
         if J_plus - J <= alpha * lr * initial_slope:
             break
         lr *= tau
+        if lr < params.lr_min:
+            lr = params.lr_min
+            break
     else:
         raise Exception("Line search did not converge")
-    if disp > 0:
+    if disp > 1:
         pprint(f"  converged lr = {lr:.4e}")
     return lr
 
@@ -507,7 +501,7 @@ def minimise(
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
         dJ_ = None if it == 1 else op.dJ_progress[-1]
-
+        
         if step == _gradient_descent:
             args = [u_plus, u_, dJ_]
         elif step == _adam:
@@ -572,13 +566,6 @@ def minimise(
         op.nc_progress.append(nc)
         op.mesh_progress.append(fd.Mesh(mesh.coordinates.copy(deepcopy=True)))
 
-        # If lr is too small, the difference u-u_ will be 0, and it may cause error
-        if params.check_lr:
-            if lr < params.lr_lowerbound:
-                raise fd.ConvergenceError(
-                    term_msg + "fail, because control variable didn't move"
-                )
-
         # Check for QoI divergence
         if it > 1 and np.abs(J / np.min(op.J_progress)) > params.dtol:
             raise fd.ConvergenceError(term_msg + "dtol divergence")
@@ -603,13 +590,7 @@ def minimise(
 
         if it > 2 and mesh_adaptation:
             J_ = op.J_progress[-2]
-            if nc < nc_:
-                mesh_adaptation = False
-                adaptor = identity_mesh
-                if params.disp > 1:
-                    pprint("NOTE: turning adaptation off due to mesh converged")
-                continue
-            elif np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
+            if np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
                 mesh_adaptation = False
                 adaptor = identity_mesh
                 if params.disp > 1:
