@@ -26,7 +26,7 @@ for run in runs:
     J = np.load(f"{demo}/data/{run}_progress_J_{n}_{method}.npy")
     t = np.load(f"{demo}/data/{run}_progress_t_{n}_{method}.npy")
     times = [sum(t[:i]) for i in range(len(t))]
-    axes.loglog(times, J, label=method)
+    axes.loglog(times, J, label=run)
 axes.grid(True)
 axes.set_xlabel("Cumulative CPU time (seconds)")
 axes.set_ylabel("Objective function value")
