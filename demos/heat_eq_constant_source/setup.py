@@ -21,7 +21,7 @@ def initial_control(mesh):
     return Function(R).assign(0.1)
 
 
-def forward_run(mesh, control, **kwargs):
+def forward_run(mesh, control, outfile=None, **kwargs):
     """
     Solve the PDEs in the given mesh
     """
@@ -35,6 +35,8 @@ def forward_run(mesh, control, **kwargs):
     F = (inner(grad(u), grad(v)) - m * v) * dx
     bc = DirichletBC(V, 0.0, "on_boundary")
     solve(F == 0, u, bc)
+    if outfile is not None:
+        outfile.write(u)
 
     # The functional of interest is the normed difference between desired
     # and simulated temperature profile
