@@ -21,27 +21,27 @@ def initial_control(mesh):
     return Function(V, name="Control")
 
 
-def forward_run(mesh, control, **kwargs):
+def forward_run(mesh, control, outfile=None, **kwargs):
     """
     Solve the PDEs in the given mesh
     """
     V = FunctionSpace(mesh, "CG", 1)
     u = Function(V, name="State")
     v = TestFunction(V)
-    m = Function(V, name="Control").assign(control)
+    m = Function(V).assign(control)
 
     # Run the forward model once to create the simulation record
     F = (inner(grad(u), grad(v)) - m * v) * dx
     bc = DirichletBC(V, 0.0, "on_boundary")
     sp = {
         "mat_type": "aij",  # Matrix type that we need to use a direct solver
-        "snes_monitor": None, # Print the nonlinear solver progress
         "ksp_type": "preonly",  # Don't use a linear solver, just apply a preconditioner
-        "ksp_monitor": None,  # Print the linear solver progress
         "pc_type": "lu",  # Use a full LU decomposition as a preconditioner
         "pc_factor_mat_solver_type": "mumps",  # Use the MUMPS package to compute the LU decomposition
     }
     solve(F == 0, u, bc, solver_parameters=sp)
+    if outfile is not None:
+        outfile.write(u)
 
     # The functional of interest is the normed difference between desired
     # and simulated temperature profile
