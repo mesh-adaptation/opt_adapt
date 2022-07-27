@@ -6,7 +6,6 @@ from firedrake.adjoint import get_solve_blocks
 import ufl
 import numpy as np
 from time import perf_counter
-import matplotlib.pyplot as plt
 from opt_adapt.utils import *
 
 
