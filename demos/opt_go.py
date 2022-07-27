@@ -16,7 +16,6 @@ from time import perf_counter
 import matplotlib.pyplot as plt
 
 
-
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )

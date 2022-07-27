@@ -13,7 +13,6 @@ from firedrake import triplot
 import matplotlib.pyplot as plt
 
 
-
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )

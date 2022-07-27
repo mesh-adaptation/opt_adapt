@@ -500,7 +500,7 @@ def minimise(
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
         dJ_ = None if it == 1 else op.dJ_progress[-1]
-        
+
         if step == _gradient_descent:
             args = [u_plus, u_, dJ_]
         elif step == _adam:

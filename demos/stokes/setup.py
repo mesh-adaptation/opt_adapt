@@ -4,6 +4,7 @@ from pyroteus.metric import *
 from pyroteus.recovery import *
 from opt_adapt.opt import get_state
 
+
 def initial_mesh(n):
     """
     Construction of initial mesh
@@ -29,16 +30,16 @@ def forward_run(mesh, control, outfile=None, **kwargs):
     # Create a mixed function space for u and p
     V = VectorFunctionSpace(mesh, "Lagrange", 2)
     Q = FunctionSpace(mesh, "Lagrange", 1)
-    W = V*Q
+    W = V * Q
 
     # Set up trial and test functions
     v, q = TestFunctions(W)
     u, p = TrialFunctions(W)
 
     # Build boundary conditions
-    nu = Constant(1)     # Viscosity coefficient
+    nu = Constant(1)  # Viscosity coefficient
     x, y = SpatialCoordinate(mesh)
-    u_inflow = as_vector([y*(10-y)/25.0, 0])
+    u_inflow = as_vector([y * (10 - y) / 25.0, 0])
     noslip = DirichletBC(W.sub(0), (0, 0), (3, 5))
     inflow = DirichletBC(W.sub(0), interpolate(u_inflow, V), 1)
     static_bcs = [inflow, noslip]
@@ -47,8 +48,12 @@ def forward_run(mesh, control, outfile=None, **kwargs):
     bcs = static_bcs + controlled_bcs
 
     # Define the bilinear and linear forms
-    a = nu*inner(grad(u), grad(v))*dx - inner(p, div(v))*dx - inner(q, div(u))*dx
-    L = Constant(0)*q*dx
+    a = (
+        nu * inner(grad(u), grad(v)) * dx
+        - inner(p, div(v)) * dx
+        - inner(q, div(u)) * dx
+    )
+    L = Constant(0) * q * dx
 
     # Solve the forward problem
     w = Function(W)
@@ -66,7 +71,9 @@ def forward_run(mesh, control, outfile=None, **kwargs):
     # Conpute the objective function value
     u, p = split(w)
     alpha = Constant(10)
-    J = assemble(1./2*inner(grad(u), grad(u))*dx + alpha/2*inner(g, g)*ds(4))
+    J = assemble(
+        1.0 / 2 * inner(grad(u), grad(u)) * dx + alpha / 2 * inner(g, g) * ds(4)
+    )
 
     return J, g
 
