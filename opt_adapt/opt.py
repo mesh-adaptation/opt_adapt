@@ -201,13 +201,15 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     P = dJ.copy(deepcopy=True)
     P *= -1
 
-    # Choose step length
-    if u_ is not None and dJ_ is not None:
+    # Choose step length by the Barzilai-Borwein formal
+    if u_ is None or dJ_ is None:
+        lr = params.lr
+    else:
         dJ_ = params.transfer_fn(dJ_, dJ.function_space())
         u_ = params.transfer_fn(u_, u.function_space())
         dJ_diff = fd.assemble(ufl.inner(dJ_ - dJ, dJ_ - dJ) * ufl.dx)
-        params.lr = abs(fd.assemble(ufl.inner(u_ - u, dJ_ - dJ) * ufl.dx) / dJ_diff)
-    lr = line_search(forward_run, m, u, P, J, dJ, params)
+        lr = abs(fd.assemble(ufl.inner(u_ - u, dJ_ - dJ) * ufl.dx) / dJ_diff)
+    lr = max(lr, params.lr_min)
 
     # Take a step downhill
     u += lr * P
@@ -587,18 +589,20 @@ def minimise(
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
+        # If mesh converged or QOI value converged 
+        # Mesh adaptation will be turning off
         if it > 2 and mesh_adaptation:
             J_ = op.J_progress[-2]
             if np.abs(J - J_) < params.qoi_rtol * np.abs(J_):
                 mesh_adaptation = False
                 adaptor = identity_mesh
-                if params.disp > 1:
+                if params.disp > 0:
                     pprint("NOTE: turning adaptation off due to qoi_rtol convergence")
                 continue
             elif np.abs(nc - nc_) < params.element_rtol * nc_:
                 mesh_adaptation = False
                 adaptor = identity_mesh
-                if params.disp > 1:
+                if params.disp > 0:
                     pprint(
                         "NOTE: turning adaptation off due to element_rtol convergence"
                     )

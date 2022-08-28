@@ -131,7 +131,7 @@ with open(f"{demo}/data/hessian_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
 
-
+# Plot the final mesh
 plot_dir = create_directory(f"{demo}/plots")
 fig, axes = plt.subplots()
 triplot(op.mesh_progress[-1], axes=axes)

@@ -15,7 +15,7 @@ def initial_mesh(n):
 def initial_control(mesh):
     """
     The initial of control parameter
-    In this example, control parameter is not in Real space
+    In this example, control parameter is in Real space
     """
     R = FunctionSpace(mesh, "R", 0)
     return Function(R).assign(0.1)
