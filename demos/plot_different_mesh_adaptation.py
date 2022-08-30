@@ -21,17 +21,14 @@ method = args.method
 plot_dir = create_directory(f"{demo}/plots")
 
 runs = ["uniform", "hessian", "go"]
-linestyle=["solid", "dashed", "dotted"]
+linestyle = ["solid", "dashed", "dotted"]
 fig, axes = plt.subplots()
-i = 0
-for run in runs:
+for i, run in enumerate(runs):
     J = np.load(f"{demo}/data/{run}_progress_J_{n}_{method}.npy")
     t = np.load(f"{demo}/data/{run}_progress_t_{n}_{method}.npy")
-    nc = np.load(f"{demo}/data/{run}_progress_nc_{n}_{method}.npy")
-    nc = nc[-1]
+    nc_final = np.load(f"{demo}/data/{run}_progress_nc_{n}_{method}.npy")[-1]
     times = [sum(t[:i]) for i in range(len(t))]
-    axes.loglog(times, J, label=f"{run} (final mesh has {nc} elements)", linestyle=linestyle[i])
-    i += 1
+    axes.loglog(times, J, label=f"{run} with {nc_final} elements in final mesh", linestyle=linestyle[i])
 axes.grid(True)
 axes.set_xlabel("Cumulative CPU time (seconds)")
 axes.set_ylabel("Objective function value")
@@ -40,14 +37,12 @@ plt.tight_layout()
 plt.savefig(f"{plot_dir}/qoi_vs_time_{method}_{n}.png")
 plt.close()
 fig, axes = plt.subplots()
-i = 0
-for run in runs:
+
+for i, run in enumerate(runs):
     J = np.load(f"{demo}/data/{run}_progress_J_{n}_{method}.npy")
     it = np.array(range(len(J))) + 1
-    nc = np.load(f"{demo}/data/{run}_progress_nc_{n}_{method}.npy")
-    nc = nc[-1]
-    axes.loglog(it, J, label=f"{run} (final mesh has {nc} elements)", linestyle=linestyle[i])
-    i += 1
+    nc_final = np.load(f"{demo}/data/{run}_progress_nc_{n}_{method}.npy")[-1]
+    axes.loglog(it, J, label=f"{run} with {nc_final} elements in final mesh", linestyle=linestyle[i])
 axes.grid(True)
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Objective function value")
