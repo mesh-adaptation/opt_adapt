@@ -201,7 +201,7 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     P = dJ.copy(deepcopy=True)
     P *= -1
 
-    # Choose step length by the Barzilai-Borwein formal
+    # Choose step length by the Barzilai-Borwein formula
     if u_ is None or dJ_ is None:
         lr = params.lr
     else:
@@ -589,7 +589,7 @@ def minimise(
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
-        # If mesh converged or QOI value converged 
+        # If mesh converged or QoI value converged 
         # Mesh adaptation will be turning off
         if it > 2 and mesh_adaptation:
             J_ = op.J_progress[-2]
