@@ -28,7 +28,7 @@ for i, run in enumerate(runs):
     t = np.load(f"{demo}/data/{run}_progress_t_{n}_{method}.npy")
     nc_final = np.load(f"{demo}/data/{run}_progress_nc_{n}_{method}.npy")[-1]
     times = [sum(t[:i]) for i in range(len(t))]
-    axes.loglog(times, J, label=f"{run} with {nc_final} elements in final mesh", linestyle=linestyle[i])
+    axes.loglog(times, J, label=f"{run} ({nc_final} elements)", linestyle=linestyle[i])
 axes.grid(True)
 axes.set_xlabel("Cumulative CPU time (seconds)")
 axes.set_ylabel("Objective function value")
@@ -42,7 +42,7 @@ for i, run in enumerate(runs):
     J = np.load(f"{demo}/data/{run}_progress_J_{n}_{method}.npy")
     it = np.array(range(len(J))) + 1
     nc_final = np.load(f"{demo}/data/{run}_progress_nc_{n}_{method}.npy")[-1]
-    axes.loglog(it, J, label=f"{run} with {nc_final} elements in final mesh", linestyle=linestyle[i])
+    axes.loglog(it, J, label=f"{run} ({nc_final} elements)", linestyle=linestyle[i])
 axes.grid(True)
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Objective function value")
