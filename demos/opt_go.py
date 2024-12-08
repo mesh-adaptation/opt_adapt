@@ -6,14 +6,24 @@ from time import perf_counter
 import matplotlib.pyplot as plt
 import numpy as np
 from firedrake import *
+from firedrake_adjoint import *
 from firedrake.adjoint import get_solve_blocks
 from firedrake.meshadapt import RiemannianMetric, adapt
-from firedrake_adjoint import *
-from pyroteus.error_estimation import *
-from pyroteus.log import pyrint
-from pyroteus.metric import *
-from pyroteus.recovery import *
-from pyroteus.utility import File, create_directory
+from animate.adapt import adapt
+from animate.metric import RiemannianMetric
+from animate.utility import VTKFile
+from goalie.log import pyrint
+from goalie.utility import create_directory
+from pyroteus.error_estimation import *  # TODO: Use Goalie
+from pyroteus.metric import *  # TODO: Use Goalie
+from pyroteus.recovery import *  # TODO: Use Goalie
+
+import argparse
+import importlib
+import numpy as np
+import os
+from time import perf_counter
+import matplotlib.pyplot as plt
 
 from opt_adapt.opt import *
 

@@ -5,12 +5,13 @@ from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
+from animate.adapt import adapt
+from animate.metric import RiemannianMetric
+from animate.utility import VTKFile
+from goalie.log import pyrint
+from goalie.utility import create_directory
 from firedrake import triplot
-from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
-from pyroteus.log import pyrint
-from pyroteus.metric import enforce_element_constraints, space_normalise
-from pyroteus.utility import File, create_directory
 
 from opt_adapt.opt import *
 
@@ -55,7 +56,7 @@ params = OptAdaptParameters(
         "target_max": target,
         "model_options": {
             "no_exports": True,
-            "outfile": File(
+            "outfile": VTKFile(
                 f"{demo}/outputs_hessian/{method}/solution.pvd", adaptive=True
             ),
         },
@@ -74,11 +75,21 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     :kwarg norm_order: Normalisation order :math:`p` for the
     :math:`L^p` normalisation routine.
     """
-    metric = space_normalise(setup.hessian(mesh), target, norm_order)
-    enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
+    metric = setup.hessian(mesh)
+    metric_parameters = {
+        "dm_plex_metric": {
+            "target_complexity": target,
+            "p": norm_order,
+            "dm_plex_metric_h_min": 1.0e-05,
+            "dm_plex_metric_h_max": 500.0,
+            "dm_plex_metric_a_max": 1000.0,
+        }
+    }
+    metric.set_parameters()
+    metric.normalise()
     if args.disp > 2:
         pyrint("Metric construction complete.")
-    newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
+    newmesh = adapt(mesh, metric)
     if args.disp > 2:
         pyrint("Mesh adaptation complete.")
     return newmesh
