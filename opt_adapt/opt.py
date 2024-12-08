@@ -110,7 +110,7 @@ class OptAdaptParameters:
         self.target_max = 1000.0  # Eventual target metric complexity
 
         # Apply user-specified values
-        for key, value in options.items():
+        for key, value in self.model_options.items():
             if not hasattr(self, key):
                 raise ValueError(f"Option {key} not recognised")
             self.__setattr__(key, value)
