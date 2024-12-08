@@ -30,7 +30,7 @@ for method, label in labels.items():
     cpu = []
     J = []
     for fname in glob.glob(f"data/{method}_*.log"):
-        ext = fname.split("_")[-1][:-4]
+        ext = "_".join(fname.split("_")[1:])[:-4]
         with open(fname, "r") as f:
             words = f.readline().split()
             if len(words) > 2 and "FAIL" in words[2]:

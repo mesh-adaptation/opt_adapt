@@ -4,8 +4,9 @@ import os
 from time import perf_counter
 
 import numpy as np
-from pyroteus.log import pyrint
-from pyroteus.utility import File, create_directory
+from animate.utility import VTKFile
+from goalie.log import pyrint
+from goalie.utility import create_directory
 
 from opt_adapt.opt import *
 
@@ -45,7 +46,7 @@ params = OptAdaptParameters(
         "gtol": args.gtol,
         "model_options": {
             "no_exports": True,
-            "outfile": File(
+            "outfile": VTKFile(
                 f"{demo}/outputs_uniform/{method}/solution.pvd", adaptive=True
             ),
         },

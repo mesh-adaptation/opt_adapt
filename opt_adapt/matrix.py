@@ -1,6 +1,6 @@
 import firedrake as fd
-import firedrake_adjoint as fd_adj
 import numpy as np
+from firedrake.adjoint import pyadjoint
 
 __class__ = ["Matrix", "OuterProductMatrix", "compute_full_hessian"]
 
@@ -163,9 +163,9 @@ def compute_full_hessian(J, u):
     :arg J: the functional
     :arg u: the :class:`Control`
     """
-    if not isinstance(u, fd_adj.Control):
+    if not isinstance(u, pyadjoint.Control):
         raise ValueError(f"Second argument should be a Control, not {type(u)}")
-    Jhat = fd_adj.ReducedFunctional(J, u)
+    Jhat = pyadjoint.ReducedFunctional(J, u)
     fs = u.data().function_space()
     H = Matrix(fs).set(0.0)
     h = fd.Function(fs).assign(0.0)

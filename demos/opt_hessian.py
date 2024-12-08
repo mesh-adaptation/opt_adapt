@@ -3,14 +3,11 @@ import importlib
 import os
 from time import perf_counter
 
-import matplotlib.pyplot as plt
 import numpy as np
-from firedrake import triplot
-from firedrake.meshadapt import RiemannianMetric, adapt
-from firedrake_adjoint import *
-from pyroteus.log import pyrint
-from pyroteus.metric import enforce_element_constraints, space_normalise
-from pyroteus.utility import File, create_directory
+from animate.adapt import adapt
+from animate.utility import VTKFile
+from goalie.log import pyrint
+from goalie.utility import create_directory
 
 from opt_adapt.opt import *
 
@@ -55,7 +52,7 @@ params = OptAdaptParameters(
         "target_max": target,
         "model_options": {
             "no_exports": True,
-            "outfile": File(
+            "outfile": VTKFile(
                 f"{demo}/outputs_hessian/{method}/solution.pvd", adaptive=True
             ),
         },
@@ -74,11 +71,22 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     :kwarg norm_order: Normalisation order :math:`p` for the
     :math:`L^p` normalisation routine.
     """
-    metric = space_normalise(setup.hessian(mesh), target, norm_order)
-    enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
+    metric = setup.hessian(mesh)
+    metric.set_parameters(
+        {
+            "dm_plex_metric": {
+                "target_complexity": target,
+                "p": norm_order,
+                "h_min": 1.0e-05,
+                "h_max": 500.0,
+                "a_max": 1000.0,
+            }
+        }
+    )
+    metric.normalise()
     if args.disp > 2:
         pyrint("Metric construction complete.")
-    newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
+    newmesh = adapt(mesh, metric)
     if args.disp > 2:
         pyrint("Mesh adaptation complete.")
     return newmesh
@@ -131,11 +139,3 @@ np.save(f"{demo}/data/hessian_progress_nc_{n}_{method}", nc)
 with open(f"{demo}/data/hessian_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
-
-# Plot the final mesh
-plot_dir = create_directory(f"{demo}/plots")
-fig, axes = plt.subplots()
-triplot(op.mesh_progress[-1], axes=axes)
-axes.legend()
-plt.tight_layout()
-plt.savefig(f"{plot_dir}/mesh_hessian_{method}.png")

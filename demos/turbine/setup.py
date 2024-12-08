@@ -1,13 +1,21 @@
 import logging
 
-from pyroteus.metric import *
-from pyroteus.recovery import *
-from thetis import *
+import numpy as np
+import ufl
+from animate.metric import RiemannianMetric
+from firedrake.assemble import assemble
+from firedrake.constant import Constant
+from firedrake.function import Function
+from firedrake.functionspace import FunctionSpace, TensorFunctionSpace
+from firedrake.utility_meshes import RectangleMesh
+from thetis.options import TidalTurbineFarmOptions
+from thetis.solver2d import FlowSolver2d
+from thetis.utility import get_functionspace
 
 from opt_adapt.opt import get_state
 
 logger = logging.getLogger("thetis_output")
-logger.setLevel(ERROR)
+logger.setLevel(logging.ERROR)
 
 
 def initial_mesh(n=4):
@@ -26,7 +34,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     Optionally, pass an initial value for the control variable
     (y-coordinate of the centre of the second turbine).
     """
-    x, y = SpatialCoordinate(mesh)
+    x, y = ufl.SpatialCoordinate(mesh)
 
     # Setup bathymetry
     H = 40.0
@@ -35,7 +43,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     bathymetry.assign(H)
 
     # Setup solver
-    solver_obj = solver2d.FlowSolver2d(mesh, bathymetry)
+    solver_obj = FlowSolver2d(mesh, bathymetry)
     options = solver_obj.options
     options.element_family = "dg-cg"
     options.timestep = 20.0
@@ -63,7 +71,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
 
     # Setup boundary conditions
     P1v_2d = solver_obj.function_spaces.P1v_2d
-    u_in = interpolate(as_vector([5.0, 0.0]), P1v_2d)
+    u_in = Function(P1v_2d).interpolate(ufl.as_vector([5.0, 0.0]))
     bcs = {
         1: {"uv": u_in},
         2: {"elev": Constant(0.0)},
@@ -93,14 +101,14 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
         r = 18.0 / 2
         qx = ((x - x0) / r) ** 2
         qy = ((y - y0) / r) ** 2
-        cond = And(qx < 1, qy < 1)
-        b = exp(1 - 1 / (1 - qx)) * exp(1 - 1 / (1 - qy))
-        return conditional(cond, Constant(scale) * b, 0)
+        cond = ufl.And(qx < 1, qy < 1)
+        b = ufl.exp(1 - 1 / (1 - qx)) * ufl.exp(1 - 1 / (1 - qy))
+        return ufl.conditional(cond, Constant(scale) * b, 0)
 
-    b1 = assemble(bump(x1, y1) * dx)
-    b2 = assemble(bump(x2, y2) * dx)
-    b3 = assemble(bump(x3, y3) * dx)
-    bc = assemble(bump(xc, yc) * dx)
+    b1 = assemble(bump(x1, y1) * ufl.dx)
+    b2 = assemble(bump(x2, y2) * ufl.dx)
+    b3 = assemble(bump(x3, y3) * ufl.dx)
+    bc = assemble(bump(xc, yc) * ufl.dx)
     assert b1 > 0.0, f"Invalid area for turbine 1: {b1}"
     assert b2 > 0.0, f"Invalid area for turbine 2: {b2}"
     assert b3 > 0.0, f"Invalid area for turbine 3: {b3}"
@@ -113,34 +121,36 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     )
 
     # Setup tidal farm
-    Ct = Ct * 4.0 / (1.0 + sqrt(1.0 - Ct * At / (H * D)))  # thrust correction
+    Ct = Ct * 4.0 / (1.0 + ufl.sqrt(1.0 - Ct * At / (H * D)))  # thrust correction
     farm_options = TidalTurbineFarmOptions()
     farm_options.turbine_density = bumps
     farm_options.turbine_options.diameter = 18.0
     farm_options.turbine_options.thrust_coefficient = Ct
-    options.tidal_turbine_farms = {"everywhere": farm_options}
+    options.tidal_turbine_farms = {"everywhere": [farm_options]}
     rho = Constant(1030.0)
 
     # Apply initial conditions and solve
     solver_obj.assign_initial_conditions(uv=u_in)
     solver_obj.iterate()
     if outfile is not None:
-        u, eta = solver_obj.fields.solution_2d.split()
+        u, eta = solver_obj.fields.solution_2d.subfunctions
         outfile.write(u, eta)
 
     # Define objective function
-    u, eta = split(solver_obj.fields.solution_2d)
-    coeff = -rho * 0.5 * Ct * (pi * D / 2) ** 2 / At * bumps
-    J_power = coeff * dot(u, u) ** 1.5 * dx
+    u, eta = ufl.split(solver_obj.fields.solution_2d)
+    coeff = -rho * 0.5 * Ct * (ufl.pi * D / 2) ** 2 / At * bumps
+    J_power = coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
     # NOTE: negative because we want maximum
 
     # Add a regularisation term for constraining the control
-    area = assemble(Constant(1.0) * dx(domain=mesh))
+    area = assemble(Constant(1.0) * ufl.dx(domain=mesh))
     alpha = 1.0 / area
     J_reg = (
         alpha
-        * conditional(yc < y2, (yc - y2) ** 2, conditional(yc > y3, (yc - y3) ** 2, 0))
-        * dx
+        * ufl.conditional(
+            yc < y2, (yc - y2) ** 2, ufl.conditional(yc > y3, (yc - y3) ** 2, 0)
+        )
+        * ufl.dx
     )
 
     J = assemble(J_power + J_reg, ad_block_tag="qoi")
@@ -155,10 +165,14 @@ def hessian(mesh, **kwargs):
     :kwarg adjoint: If ``True``, recover Hessians from the
     adjoint state, rather than the forward one.
     """
-    uv, eta = get_state(**kwargs).split()
-    V = FunctionSpace(mesh, uv.ufl_element().family(), uv.ufl_element().degree())
-    u = interpolate(uv[0], V)
-    v = interpolate(uv[1], V)
+    uv, eta = get_state(**kwargs).subfunctions
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    metric_parameters = {
+        "dm_plex_metric": {
+            "p": np.inf,
+            "target_complexity": 1000.0,
+        }
+    }
 
     def hessian_component(f):
         """
@@ -166,9 +180,12 @@ def hessian(mesh, **kwargs):
         scale it so that all of the components are of
         consistent metric complexity.
         """
-        return space_normalise(hessian_metric(recover_hessian(f)), 1000.0, "inf")
+        component = RiemannianMetric(P1_ten)
+        component.set_parameters(metric_parameters)
+        component.compute_hessian(f, method="mixed_L2")
+        component.normalise(restrict_sizes=False, restrict_anisotropy=False)
+        return component
 
-    metric = metric_intersection(
-        hessian_component(u), hessian_component(v), hessian_component(eta)
-    )
+    metric = hessian_component(uv[0])
+    metric.intersect(hessian_component(uv[1]), hessian_component(eta))
     return metric
