@@ -105,7 +105,10 @@ def test_hessian(r_space, gradient):
     # Compute its gradient and check the accuracy
     if gradient:
         g = compute_gradient(J, c)
-        dJdX = assemble(test * (3 * X**2 + 2 * X + 1) * dx)
+        lhs = TrialFunction(fs) * test * dx
+        rhs = test * (3 * X**2 + 2 * X + 1) * dx
+        dJdX = Function(fs)
+        solve(lhs == rhs, dJdX)
         assert np.isclose(errornorm(g, dJdX), 0)
 
     # Compute its Hessian and check the accuracy
