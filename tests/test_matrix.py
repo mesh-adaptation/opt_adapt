@@ -3,6 +3,7 @@ Tests for the :class:`Matrix` class.
 """
 from firedrake import *
 from firedrake_adjoint import *
+import pyadjoint
 from opt_adapt.matrix import *
 from animate import errornorm
 import numpy as np
@@ -103,6 +104,7 @@ def test_hessian(r_space, gradient):
     J = assemble((X**3 + X**2 + X + 1) * dx)
 
     # Compute its gradient and check the accuracy
+    pyadjoint.pause_annotation()
     lhs = TrialFunction(fs) * test * dx
     if gradient:
         g = compute_gradient(J, c)
@@ -118,3 +120,4 @@ def test_hessian(r_space, gradient):
     solve(lhs == rhs, d2JdX2)
     expected = Matrix(fs).set(d2JdX2.dat.data)
     assert np.allclose(H.array, expected.array)
+    pyadjoint.continue_annotation()

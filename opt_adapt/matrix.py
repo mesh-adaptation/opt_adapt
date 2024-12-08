@@ -169,8 +169,7 @@ def compute_full_hessian(J, u):
     Jhat = fd_adj.ReducedFunctional(J, u)
     fs = u.data().function_space()
     H = Matrix(fs).set(0.0)
-    h = fd.Function(fs)
-    tmp = Matrix(fs)
+    h = fd.Function(fs).assign(0.0)
 
     # Compute gradient, if required
     if u.block_variable.adj_value is None:
@@ -179,7 +178,6 @@ def compute_full_hessian(J, u):
     # Compute the Hessian by propagating unit vectors
     for i in range(H.n):
         h.dat.data[i] = 1.0
-        tmp.set(Jhat.hessian(h).dat.data)
-        H.add(tmp)
+        H.add(Matrix(fs).set(Jhat.hessian(h).dat.data))
         h.dat.data[i] = 0.0
     return H
