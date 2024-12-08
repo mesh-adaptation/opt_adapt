@@ -117,6 +117,7 @@ def test_hessian(r_space, gradient):
     lhs = TrialFunction(fs) * test * ufl.dx
     if gradient:
         g = compute_gradient(J, c)
+        lhs = TrialFunction(fs) * test * dx
         rhs = test * (3 * X**2 + 2 * X + 1) * ufl.dx
         dJdX = Function(fs)
         solve(lhs == rhs, dJdX)
