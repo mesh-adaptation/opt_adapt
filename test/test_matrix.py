@@ -103,6 +103,7 @@ def test_hessian(r_space, gradient):
     Test that :func:`compute_full_hessian` can successfully
     compute the Hessian of a simple expression.
     """
+    pyadjoint.continue_annotation()
     fs = function_space(r_space)
     test = TestFunction(fs)
     x, y = ufl.SpatialCoordinate(fs.mesh())
@@ -130,4 +131,3 @@ def test_hessian(r_space, gradient):
     solve(lhs == rhs, d2JdX2)
     expected = Matrix(fs).set(d2JdX2.dat.data)
     assert np.allclose(H.array, expected.array)
-    pyadjoint.continue_annotation()
