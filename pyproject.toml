@@ -5,7 +5,9 @@ requires = ["setuptools"]
 name = "opt_adapt"
 version = "0.2"
 dependencies = [
+  "netCDF4",
   "pre-commit",
+  "pyproj",
   "pytest",
   "ruff",
 ]
