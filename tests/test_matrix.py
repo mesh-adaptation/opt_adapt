@@ -103,9 +103,9 @@ def test_hessian(r_space, gradient):
     J = assemble((X**3 + X**2 + X + 1) * dx)
 
     # Compute its gradient and check the accuracy
+    lhs = TrialFunction(fs) * test * dx
     if gradient:
         g = compute_gradient(J, c)
-        lhs = TrialFunction(fs) * test * dx
         rhs = test * (3 * X**2 + 2 * X + 1) * dx
         dJdX = Function(fs)
         solve(lhs == rhs, dJdX)
@@ -113,6 +113,8 @@ def test_hessian(r_space, gradient):
 
     # Compute its Hessian and check the accuracy
     H = compute_full_hessian(J, c)
-    d2JdX2 = assemble(test * (6 * X + 2) * dx)
+    rhs = test * (6 * X + 2) * dx
+    d2JdX2 = Function(fs)
+    solve(lhs == rhs, d2JdX2)
     expected = Matrix(fs).set(d2JdX2.dat.data)
     assert np.allclose(H.array, expected.array)
