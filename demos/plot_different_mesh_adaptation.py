@@ -1,10 +1,11 @@
-from opt_adapt.opt import _implemented_methods
-from opt_adapt.utils import create_directory
 import argparse
-import matplotlib.pyplot as plt
-import numpy as np
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+from opt_adapt.opt import _implemented_methods
+from opt_adapt.utils import create_directory
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,

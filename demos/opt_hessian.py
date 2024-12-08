@@ -1,17 +1,18 @@
-from pyroteus.log import pyrint
-from pyroteus.utility import create_directory, File
-from firedrake.meshadapt import RiemannianMetric, adapt
-from firedrake_adjoint import *
-from pyroteus.metric import space_normalise, enforce_element_constraints
-from opt_adapt.opt import *
 import argparse
 import importlib
-import numpy as np
 import os
 from time import perf_counter
-from firedrake import triplot
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import numpy as np
+from firedrake import triplot
+from firedrake.meshadapt import RiemannianMetric, adapt
+from firedrake_adjoint import *
+from pyroteus.log import pyrint
+from pyroteus.metric import enforce_element_constraints, space_normalise
+from pyroteus.utility import File, create_directory
+
+from opt_adapt.opt import *
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,

@@ -1,9 +1,10 @@
-from thetis import *
-from pyroteus.metric import *
-from pyroteus.recovery import *
-from opt_adapt.opt import get_state
 import logging
 
+from pyroteus.metric import *
+from pyroteus.recovery import *
+from thetis import *
+
+from opt_adapt.opt import get_state
 
 logger = logging.getLogger("thetis_output")
 logger.setLevel(ERROR)

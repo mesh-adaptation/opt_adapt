@@ -1,8 +1,8 @@
+import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
-import argparse
 from thetis import create_directory
-
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
