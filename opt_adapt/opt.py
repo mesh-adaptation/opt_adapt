@@ -196,7 +196,11 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     """
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
+    pyadjoint.pause_annotation()
     dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
@@ -242,7 +246,11 @@ def _adam(it, forward_run, m, params, u, a_, b_):
     epsilon = params.epsilon
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
+    pyadjoint.pause_annotation()
     dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
@@ -286,7 +294,11 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
     """
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J_, u_ = forward_run(m, u, **params.model_options)
+    pyadjoint.pause_annotation()
     dJ_ = pyadjoint.compute_gradient(J_, pyadjoint.Control(u_))
     yield {"J": J_, "u": u_.copy(deepcopy=True), "dJ": dJ_.copy(deepcopy=True)}
 
@@ -356,7 +368,11 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
     :arg dJ_: the previous gradient value
     :arg B: the previous Hessian approximation
     """
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
+    pyadjoint.pause_annotation()
     dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     B = B or Matrix(u.function_space())
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
@@ -407,7 +423,11 @@ def _newton(it, forward_run, m, params, u):
     """
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
+    pyadjoint.pause_annotation()
     dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     ddJ = compute_full_hessian(J, pyadjoint.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
