@@ -74,7 +74,7 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     :math:`L^p` normalisation routine.
     """
     metric = setup.hessian(mesh)
-    metric_parameters = {
+    metric.set_parameters({
         "dm_plex_metric": {
             "target_complexity": target,
             "p": norm_order,
@@ -82,8 +82,7 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
             "dm_plex_metric_h_max": 500.0,
             "dm_plex_metric_a_max": 1000.0,
         }
-    }
-    metric.set_parameters()
+    })
     metric.normalise()
     if args.disp > 2:
         pyrint("Metric construction complete.")
@@ -140,11 +139,3 @@ np.save(f"{demo}/data/hessian_progress_nc_{n}_{method}", nc)
 with open(f"{demo}/data/hessian_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
-
-# Plot the final mesh
-plot_dir = create_directory(f"{demo}/plots")
-fig, axes = plt.subplots()
-triplot(op.mesh_progress[-1], axes=axes)
-axes.legend()
-plt.tight_layout()
-plt.savefig(f"{plot_dir}/mesh_hessian_{method}.png")
