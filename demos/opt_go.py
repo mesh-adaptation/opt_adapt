@@ -7,12 +7,10 @@ import numpy as np
 from animate.adapt import adapt
 from animate.metric import RiemannianMetric
 from firedrake import *
-from firedrake.adjoint import get_solve_blocks
+from firedrake.adjoint import get_solve_blocks, pyadjoint
+from goalie.error_estimation import get_dwr_indicator
 from goalie.log import pyrint
 from goalie.utility import create_directory
-from pyroteus.error_estimation import *  # TODO: Use Goalie
-from pyroteus.metric import *  # TODO: Use Goalie
-from pyroteus.recovery import *  # TODO: Use Goalie
 
 from opt_adapt.opt import *
 
@@ -39,7 +37,7 @@ n = args.n
 target = args.target
 model_options = {
     "no_exports": True,
-    "outfile": File(f"{demo}/outputs_go/{method}/solution.pvd", adaptive=True),
+    "outfile": VTKFile(f"{demo}/outputs_go/{method}/solution.pvd", adaptive=True),
 }
 
 # Setup initial mesh
@@ -72,7 +70,7 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
     :kwarg target: desired target metric complexity
     :kwarg alpha: convergence rate parameter for anisotropic metric
     """
-    tape = get_working_tape()
+    tape = pyadjoint.get_working_tape()
     mh = MeshHierarchy(mesh, 1)
     q_star = get_state(adjoint=True)
     assert q_star is not None
@@ -87,18 +85,21 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
 
     # Solve the forward and adjoint problem in the enriched space
     # TODO: avoid forward solve
-    ref_tape = Tape()
-    set_working_tape(ref_tape)
+    ref_tape = pyadjoint.Tape()
+    pyadjoint.set_working_tape(ref_tape)
     opts = model_options.copy()
     opts.pop("outfile")
+    pyadjoint.continue_annotation()
+    # TODO: Use Goalie to drive the following
     J_plus, u_plus = setup.forward_run(mh[1], control=control, **opts)
-    ReducedFunctional(J_plus, Control(u_plus)).derivative()
+    pyadjoint.pause_annotation()
+    pyadjoint.ReducedFunctional(J_plus, pyadjoint.Control(u_plus)).derivative()
     solve_block = get_solve_blocks()[0]
     q_plus = get_state(adjoint=False)
     q_star_plus = get_state(adjoint=True)
     F_plus = replace(solve_block.lhs - solve_block.rhs, {TrialFunction(V_plus): q_plus})
     ref_tape.clear_tape()
-    set_working_tape(tape)
+    pyadjoint.set_working_tape(tape)
     if args.disp > 2:
         pyrint("Error estimation complete.")
 
@@ -111,17 +112,33 @@ def adapt_go(mesh, target=1000.0, alpha=1.0, control=None, **kwargs):
         pyrint("Error estimator projected.")
 
     # Construct an anisotropic metric
-    metric = anisotropic_metric(
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    metric = RiemannianMetric(P1_ten)
+    metric.set_parameters(
+        {
+            "dm_plex_metric": {
+                "target_complexity": target,
+                "p": np.inf,
+                "h_min": 1.0e-05,
+                "h_max": 500.0,
+                "a_max": 1000.0,
+            }
+        }
+    )
+    metric.compute_isotropic_dwr_metric(
         indicator,
-        hessian=setup.hessian(mesh),
-        target_complexity=target,
         convergence_rate=alpha,
     )
-    space_normalise(metric, target, "inf")
-    enforce_element_constraints(metric, 1.0e-05, 500.0, 1000.0)
+    # TODO: Support switching between metric implementations
+    # metric.compute_anisotropic_dwr_metric(
+    #     indicator,
+    #     hessian=setup.hessian(mesh),
+    #     convergence_rate=alpha,
+    # )
+    metric.normalise(restrict_sizes=True, restrict_anisotropy=True)
     if args.disp > 2:
         pyrint("Metric construction complete.")
-    newmesh = adapt(mesh, RiemannianMetric(mesh).assign(metric))
+    newmesh = adapt(mesh, metric)
     if args.disp > 2:
         pyrint("Mesh adaptation complete.")
     return newmesh
