@@ -5,25 +5,15 @@ from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
-from firedrake import *
-from firedrake_adjoint import *
-from firedrake.adjoint import get_solve_blocks
-from firedrake.meshadapt import RiemannianMetric, adapt
 from animate.adapt import adapt
 from animate.metric import RiemannianMetric
-from animate.utility import VTKFile
+from firedrake import *
+from firedrake.adjoint import get_solve_blocks
 from goalie.log import pyrint
 from goalie.utility import create_directory
 from pyroteus.error_estimation import *  # TODO: Use Goalie
 from pyroteus.metric import *  # TODO: Use Goalie
 from pyroteus.recovery import *  # TODO: Use Goalie
-
-import argparse
-import importlib
-import numpy as np
-import os
-from time import perf_counter
-import matplotlib.pyplot as plt
 
 from opt_adapt.opt import *
 

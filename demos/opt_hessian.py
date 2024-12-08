@@ -6,12 +6,10 @@ from time import perf_counter
 import matplotlib.pyplot as plt
 import numpy as np
 from animate.adapt import adapt
-from animate.metric import RiemannianMetric
 from animate.utility import VTKFile
+from firedrake import triplot
 from goalie.log import pyrint
 from goalie.utility import create_directory
-from firedrake import triplot
-from firedrake_adjoint import *
 
 from opt_adapt.opt import *
 

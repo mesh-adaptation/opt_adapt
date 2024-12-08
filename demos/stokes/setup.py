@@ -1,6 +1,5 @@
 from animate.metric import RiemannianMetric
 from firedrake import *
-from firedrake_adjoint import *
 
 from opt_adapt.opt import get_state
 
