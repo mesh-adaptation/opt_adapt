@@ -77,9 +77,9 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
             "dm_plex_metric": {
                 "target_complexity": target,
                 "p": norm_order,
-                "dm_plex_metric_h_min": 1.0e-05,
-                "dm_plex_metric_h_max": 500.0,
-                "dm_plex_metric_a_max": 1000.0,
+                "h_min": 1.0e-05,
+                "h_max": 500.0,
+                "a_max": 1000.0,
             }
         }
     )
