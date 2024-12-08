@@ -4,6 +4,7 @@ Tests for the :class:`Matrix` class.
 from firedrake import *
 from firedrake_adjoint import *
 from opt_adapt.matrix import *
+from animate import errornorm
 import numpy as np
 import pytest
 
