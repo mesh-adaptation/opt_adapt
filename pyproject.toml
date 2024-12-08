@@ -26,8 +26,6 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://mesh-adaptation.github.io"
-Documentation = "https://mesh-adaptation.github.io/opt_adapt/index.html"
 Repository = "https://github.com/mesh-adaptation/opt_adapt"
 
 [tool.setuptools]
