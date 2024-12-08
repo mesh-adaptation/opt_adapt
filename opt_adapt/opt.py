@@ -68,7 +68,7 @@ class OptAdaptParameters:
         """
         Initial step length
         """
-        lr = options.pop("lr", None)
+        lr = self.model_options.pop("lr", None)
         if lr is not None:
             self.lr = lr
         elif method == "gradient_descent":
