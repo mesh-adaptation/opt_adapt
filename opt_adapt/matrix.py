@@ -2,7 +2,6 @@ import firedrake as fd
 import firedrake_adjoint as fd_adj
 import numpy as np
 
-
 __class__ = ["Matrix", "OuterProductMatrix", "compute_full_hessian"]
 
 

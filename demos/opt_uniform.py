@@ -1,12 +1,13 @@
-from pyroteus.log import pyrint
-from pyroteus.utility import create_directory, File
-from opt_adapt.opt import *
 import argparse
 import importlib
-import numpy as np
 import os
 from time import perf_counter
 
+import numpy as np
+from pyroteus.log import pyrint
+from pyroteus.utility import File, create_directory
+
+from opt_adapt.opt import *
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,

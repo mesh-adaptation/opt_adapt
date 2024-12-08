@@ -1,20 +1,21 @@
+import argparse
+import importlib
+import os
+from time import perf_counter
+
+import matplotlib.pyplot as plt
+import numpy as np
 from firedrake import *
+from firedrake.adjoint import get_solve_blocks
 from firedrake.meshadapt import RiemannianMetric, adapt
 from firedrake_adjoint import *
-from firedrake.adjoint import get_solve_blocks
 from pyroteus.error_estimation import *
 from pyroteus.log import pyrint
 from pyroteus.metric import *
 from pyroteus.recovery import *
-from pyroteus.utility import create_directory, File
-from opt_adapt.opt import *
-import argparse
-import importlib
-import numpy as np
-import os
-from time import perf_counter
-import matplotlib.pyplot as plt
+from pyroteus.utility import File, create_directory
 
+from opt_adapt.opt import *
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -175,7 +176,7 @@ with open(f"{demo}/data/go_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
 
-# Plot the final mesh 
+# Plot the final mesh
 plot_dir = create_directory(f"{demo}/plots")
 fig, axes = plt.subplots()
 triplot(op.mesh_progress[-1], axes=axes)

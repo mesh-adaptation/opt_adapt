@@ -45,9 +45,10 @@ select = [
   "I",  # isort
 ]
 ignore = [
-  "E501",  # line too long
+  "C901",  # too complex
   "E226",  # missing whitespace around arithmetic operator
   "E402",  # module level import not at top of file
+  "E501",  # line too long
   "E741",  # ambiguous variable name
   "F403",  # unable to detect undefined names
   "F405",  # name may be undefined, or defined from star imports

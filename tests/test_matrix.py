@@ -1,13 +1,22 @@
 """
 Tests for the :class:`Matrix` class.
 """
-from firedrake import *
-from firedrake_adjoint import *
-import pyadjoint
-from opt_adapt.matrix import *
-from animate import errornorm
+
 import numpy as np
 import pytest
+import ufl
+from animate import errornorm
+from firedrake.adjoint import pyadjoint
+from firedrake.assemble import assemble
+from firedrake.function import Function
+from firedrake.functionspace import FunctionSpace
+from firedrake.solving import solve
+from firedrake.ufl_expr import TestFunction, TrialFunction
+from firedrake.utility_meshes import UnitSquareMesh
+from pyadjoint.control import Control
+from pyadjoint.drivers import compute_gradient
+
+from opt_adapt.matrix import Matrix, OuterProductMatrix, compute_full_hessian
 
 
 @pytest.fixture(params=[True, False])
@@ -41,11 +50,11 @@ def test_matrix_ops(r_space):
     A, B, C = Matrix(fs), Matrix(fs), Matrix(fs)
 
     # Set them to be scalings of the identity
-    I = np.eye(A.n)
-    A.set(1.0 * I)
-    assert np.allclose(A.array, I)
-    B.set(2.0 * I)
-    C.set(3.0 * I)
+    identity = np.eye(A.n)
+    A.set(1.0 * identity)
+    assert np.allclose(A.array, identity)
+    B.set(2.0 * identity)
+    C.set(3.0 * identity)
 
     # Check that subtraction works
     C.subtract(B)
@@ -96,26 +105,26 @@ def test_hessian(r_space, gradient):
     """
     fs = function_space(r_space)
     test = TestFunction(fs)
-    x, y = SpatialCoordinate(fs.mesh())
+    x, y = ufl.SpatialCoordinate(fs.mesh())
     X = Function(fs).interpolate(x)
     c = Control(X)
 
     # Define some functional that depends only on the control
-    J = assemble((X**3 + X**2 + X + 1) * dx)
+    J = assemble((X**3 + X**2 + X + 1) * ufl.dx)
 
     # Compute its gradient and check the accuracy
     pyadjoint.pause_annotation()
-    lhs = TrialFunction(fs) * test * dx
+    lhs = TrialFunction(fs) * test * ufl.dx
     if gradient:
         g = compute_gradient(J, c)
-        rhs = test * (3 * X**2 + 2 * X + 1) * dx
+        rhs = test * (3 * X**2 + 2 * X + 1) * ufl.dx
         dJdX = Function(fs)
         solve(lhs == rhs, dJdX)
         assert np.isclose(errornorm(g, dJdX), 0)
 
     # Compute its Hessian and check the accuracy
     H = compute_full_hessian(J, c)
-    rhs = test * (6 * X + 2) * dx
+    rhs = test * (6 * X + 2) * ufl.dx
     d2JdX2 = Function(fs)
     solve(lhs == rhs, d2JdX2)
     expected = Matrix(fs).set(d2JdX2.dat.data)

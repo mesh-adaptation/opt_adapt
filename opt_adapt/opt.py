@@ -1,13 +1,14 @@
-from opt_adapt.matrix import *
-from opt_adapt.utils import pprint
+from time import perf_counter
+
 import firedrake as fd
 import firedrake_adjoint as fd_adj
-from firedrake.adjoint import get_solve_blocks
-import ufl
 import numpy as np
-from time import perf_counter
-from opt_adapt.utils import *
+import ufl
+from firedrake.adjoint import get_solve_blocks
 
+from opt_adapt.matrix import *
+from opt_adapt.utils import *
+from opt_adapt.utils import pprint
 
 __all__ = [
     "OptimisationProgress",
@@ -40,7 +41,7 @@ class OptAdaptParameters:
     combined optimisation-adaptation routine.
     """
 
-    def __init__(self, method, Rspace=False, options={}):
+    def __init__(self, method, Rspace=False, options=None):
         """
         :arg method: the optimisation method
         :kwarg Rspace: is the control in R-space?
@@ -51,7 +52,10 @@ class OptAdaptParameters:
         self.method = method
         self.Rspace = Rspace
         self.disp = 0
-        self.model_options = {}
+        if options is None:
+            self.model_options = {}
+        else:
+            self.model_options = options
 
         """
         Mesh-to-mesh interpolation method
@@ -411,8 +415,8 @@ def _newton(it, forward_run, m, params, u):
 
     try:
         P = ddJ.copy().scale(-1).solve(dJ)
-    except np.linalg.LinAlgError:
-        raise Exception("Hessian is singular, please try the other methods")
+    except np.linalg.LinAlgError as la:
+        raise Exception("Hessian is singular, please try the other methods") from la
 
     # Take a step downhill
     lr = line_search(forward_run, m, u, P, J, dJ, params)
@@ -486,8 +490,8 @@ def minimise(
     method = method.lower()
     try:
         step, order, _ = _implemented_methods[method].values()
-    except KeyError:
-        raise ValueError(f"Method '{method}' not recognised")
+    except KeyError as ke:
+        raise ValueError(f"Method '{method}' not recognised") from ke
     params = kwargs.get("params", OptAdaptParameters(method))
     op = kwargs.get("op", OptimisationProgress())
     dJ_init = None
@@ -498,6 +502,7 @@ def minimise(
     # Enter the optimisation loop
     nc = mesh.num_cells()
     adaptor = adapt_fn
+    nc_ = None
     for it in range(1, params.maxiter + 1):
         term_msg = f"Terminated after {it} iterations due to "
         u_ = None if it == 1 else op.m_progress[-1]
@@ -589,7 +594,7 @@ def minimise(
         if it == params.maxiter:
             raise fd.ConvergenceError(term_msg + "reaching maxiter")
 
-        # If mesh converged or QoI value converged 
+        # If mesh converged or QoI value converged
         # Mesh adaptation will be turning off
         if it > 2 and mesh_adaptation:
             J_ = op.J_progress[-2]

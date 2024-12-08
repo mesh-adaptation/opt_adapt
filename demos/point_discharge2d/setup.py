@@ -20,12 +20,13 @@ since it blows up.
     Paris: R&D, Electricite de France,
     p. 134 (2014).
 """
+
 from firedrake import *
 from pyroteus.math import bessk0
 from pyroteus.metric import *
 from pyroteus.recovery import *
-from opt_adapt.opt import get_state
 
+from opt_adapt.opt import get_state
 
 dx = dx(degree=12)  # Use a high quadrature degree
 
