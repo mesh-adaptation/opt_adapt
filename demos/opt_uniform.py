@@ -1,9 +1,9 @@
 import argparse
 import importlib
-import numpy as np
 import os
 from time import perf_counter
 
+import numpy as np
 from animate.utility import VTKFile
 from goalie.log import pyrint
 from goalie.utility import create_directory

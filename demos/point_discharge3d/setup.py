@@ -22,8 +22,8 @@ since it blows up.
     p. 134 (2014).
 """
 
-from firedrake import *
 from animate.metric import RiemannianMetric
+from firedrake import *
 
 from opt_adapt.opt import get_state
 

@@ -3,11 +3,9 @@ import importlib
 import os
 from time import perf_counter
 
-import matplotlib.pyplot as plt
 import numpy as np
 from animate.adapt import adapt
 from animate.utility import VTKFile
-from firedrake import triplot
 from goalie.log import pyrint
 from goalie.utility import create_directory
 
@@ -74,15 +72,17 @@ def adapt_hessian_based(mesh, target=1000.0, norm_order=1.0, **kwargs):
     :math:`L^p` normalisation routine.
     """
     metric = setup.hessian(mesh)
-    metric.set_parameters({
-        "dm_plex_metric": {
-            "target_complexity": target,
-            "p": norm_order,
-            "dm_plex_metric_h_min": 1.0e-05,
-            "dm_plex_metric_h_max": 500.0,
-            "dm_plex_metric_a_max": 1000.0,
+    metric.set_parameters(
+        {
+            "dm_plex_metric": {
+                "target_complexity": target,
+                "p": norm_order,
+                "dm_plex_metric_h_min": 1.0e-05,
+                "dm_plex_metric_h_max": 500.0,
+                "dm_plex_metric_a_max": 1000.0,
+            }
         }
-    })
+    )
     metric.normalise()
     if args.disp > 2:
         pyrint("Metric construction complete.")

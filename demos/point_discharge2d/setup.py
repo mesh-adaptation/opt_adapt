@@ -21,11 +21,10 @@ since it blows up.
     p. 134 (2014).
 """
 
-from firedrake import *
-from animate.metric import RiemannianMetric
-from goalie.math import bessk0
-from opt_adapt.opt import get_state
 import numpy as np
+from animate.metric import RiemannianMetric
+from firedrake import *
+from goalie.math import bessk0
 
 from opt_adapt.opt import get_state
 

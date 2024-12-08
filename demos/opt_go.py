@@ -3,7 +3,6 @@ import importlib
 import os
 from time import perf_counter
 
-import matplotlib.pyplot as plt
 import numpy as np
 from animate.adapt import adapt
 from animate.metric import RiemannianMetric
