@@ -1,8 +1,15 @@
+# .gitignore
+
+# Subdirectories
 .ipynb_checkpoints/
 outputs*
 opt_adapt.egg-info/
 __pycache__/
 
+# Specific files
+.coverage
+
+# File extensions
 *.h5
 *.jpeg
 *.jpg
