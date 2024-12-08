@@ -1,7 +1,6 @@
+from animate.metric import RiemannianMetric
 from firedrake import *
 from firedrake_adjoint import *
-from pyroteus.metric import *
-from pyroteus.recovery import *
 
 from opt_adapt.opt import get_state
 
@@ -40,11 +39,11 @@ def forward_run(mesh, control, outfile=None, **kwargs):
     # Build boundary conditions
     nu = Constant(1)  # Viscosity coefficient
     x, y = SpatialCoordinate(mesh)
-    u_inflow = as_vector([y * (10 - y) / 25.0, 0])
+    u_inflow = Function(W.sub(0)).interpolate(as_vector([y * (10 - y) / 25.0, 0]))
     noslip = DirichletBC(W.sub(0), (0, 0), (3, 5))
-    inflow = DirichletBC(W.sub(0), interpolate(u_inflow, V), 1)
+    inflow = DirichletBC(W.sub(0), u_inflow, 1)
     static_bcs = [inflow, noslip]
-    g = Function(V, name="Control").assign(control)
+    g = Function(V, name="Control").project(control)
     controlled_bcs = [DirichletBC(W.sub(0), g, 4)]
     bcs = static_bcs + controlled_bcs
 
@@ -66,7 +65,7 @@ def forward_run(mesh, control, outfile=None, **kwargs):
     }
     solve(a == L, w, bcs=bcs, solver_parameters=sp)
     if outfile is not None:
-        u, p = w.split()
+        u, p = w.subfunctions
         outfile.write(u, p)
 
     # Conpute the objective function value
@@ -87,10 +86,14 @@ def hessian(mesh, **kwargs):
     :kwarg adjoint: If ``True``, recover Hessians from the
     adjoint state, rather than the forward one.
     """
-    up, eta = get_state(**kwargs).split()
-    V = FunctionSpace(mesh, up.ufl_element().family(), up.ufl_element().degree())
-    u = interpolate(up[0], V)
-    p = interpolate(up[1], V)
+    up, eta = get_state(**kwargs).subfunctions
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    metric_parameters = {
+        "dm_plex_metric": {
+            "p": np.inf,
+            "target_complexity": 1000.0,
+        }
+    }
 
     def hessian_component(f):
         """
@@ -98,9 +101,12 @@ def hessian(mesh, **kwargs):
         scale it so that all of the components are of
         consistent metric complexity.
         """
-        return space_normalise(hessian_metric(recover_hessian(f)), 1000.0, "inf")
+        component = RiemannianMetric(P1_ten)
+        component.set_parameters(metric_parameters)
+        component.compute_hessian(f, method="mixed_L2")
+        component.normalise(restrict_sizes=False, restrict_anisotropy=False)
+        return component
 
-    metric = metric_intersection(
-        hessian_component(u), hessian_component(p), hessian_component(eta)
-    )
+    metric = hessian_component(up[0])
+    metric.intersect(hessian_component(up[1]), hessian_component(eta))
     return metric
