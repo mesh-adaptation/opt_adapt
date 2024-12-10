@@ -1,10 +1,9 @@
 from time import perf_counter
 
 import firedrake as fd
-import firedrake_adjoint as fd_adj
 import numpy as np
 import ufl
-from firedrake.adjoint import get_solve_blocks
+from firedrake.adjoint import get_solve_blocks, pyadjoint
 
 from opt_adapt.matrix import *
 from opt_adapt.utils import *
@@ -197,8 +196,12 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
     """
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    pyadjoint.pause_annotation()
+    dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
     # Find the descent direction
@@ -243,8 +246,12 @@ def _adam(it, forward_run, m, params, u, a_, b_):
     epsilon = params.epsilon
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    pyadjoint.pause_annotation()
+    dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
     if a_ is None or b_ is None:
@@ -287,8 +294,12 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
     """
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J_, u_ = forward_run(m, u, **params.model_options)
-    dJ_ = fd_adj.compute_gradient(J_, fd_adj.Control(u_))
+    pyadjoint.pause_annotation()
+    dJ_ = pyadjoint.compute_gradient(J_, pyadjoint.Control(u_))
     yield {"J": J_, "u": u_.copy(deepcopy=True), "dJ": dJ_.copy(deepcopy=True)}
 
     if s is None or y is None or rho is None:
@@ -321,7 +332,7 @@ def _lbfgs(it, forward_run, m, params, u, rho, s, y, n=5):
     u = u_ + lr * P
 
     J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     sk = u.copy(deepcopy=True)
     sk -= u_
     yk = dJ.copy(deepcopy=True)
@@ -357,8 +368,12 @@ def _bfgs(it, forward_run, m, params, u, u_, dJ_, B):
     :arg dJ_: the previous gradient value
     :arg B: the previous Hessian approximation
     """
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
+    pyadjoint.pause_annotation()
+    dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
     B = B or Matrix(u.function_space())
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
@@ -408,9 +423,13 @@ def _newton(it, forward_run, m, params, u):
     """
 
     # Annotate the tape and compute the gradient
+    tape = pyadjoint.get_working_tape()
+    tape.clear_tape()
+    pyadjoint.continue_annotation()
     J, u = forward_run(m, u, **params.model_options)
-    dJ = fd_adj.compute_gradient(J, fd_adj.Control(u))
-    ddJ = compute_full_hessian(J, fd_adj.Control(u))
+    pyadjoint.pause_annotation()
+    dJ = pyadjoint.compute_gradient(J, pyadjoint.Control(u))
+    ddJ = compute_full_hessian(J, pyadjoint.Control(u))
     yield {"J": J, "u": u.copy(deepcopy=True), "dJ": dJ.copy(deepcopy=True)}
 
     try:
@@ -482,7 +501,7 @@ def minimise(
     :kwarg op: optional :class:`OptimisationProgress`
         instance
     """
-    tape = fd_adj.get_working_tape()
+    tape = pyadjoint.get_working_tape()
     tape.clear_tape()
     u_plus = initial_control_fn(mesh)
     Rspace = u_plus.ufl_element().family() == "Real"

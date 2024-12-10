@@ -1,7 +1,5 @@
+from animate.metric import RiemannianMetric
 from firedrake import *
-from firedrake_adjoint import *
-from pyroteus.metric import *
-from pyroteus.recovery import *
 
 from opt_adapt.opt import get_state
 
@@ -58,6 +56,15 @@ def hessian(mesh, **kwargs):
         than the forward one.
     """
     c = get_state(**kwargs)
-    H = hessian_metric(recover_hessian(c))
-    M = space_normalise(H, 1000.0, "inf")
-    return M
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    metric = RiemannianMetric(P1_ten)
+    metric_parameters = {
+        "dm_plex_metric": {
+            "p": np.inf,
+            "target_complexity": 1000.0,
+        }
+    }
+    metric.set_parameters(metric_parameters)
+    metric.compute_hessian(c, method="Clement")
+    metric.normalise(restrict_sizes=False, restrict_anisotropy=False)
+    return metric
