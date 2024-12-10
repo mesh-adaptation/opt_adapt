@@ -131,11 +131,12 @@ m = np.array([m.dat.data[0] for m in op.m_progress]).flatten()
 J = op.J_progress
 dJ = np.array([dj.dat.data[0] for dj in op.dJ_progress]).flatten()
 nc = op.nc_progress
-np.save(f"{demo}/data/hessian_progress_t_{n}_{method}", t)
-np.save(f"{demo}/data/hessian_progress_m_{n}_{method}", m)
-np.save(f"{demo}/data/hessian_progress_J_{n}_{method}", J)
-np.save(f"{demo}/data/hessian_progress_dJ_{n}_{method}", dJ)
-np.save(f"{demo}/data/hessian_progress_nc_{n}_{method}", nc)
+target = int(target)
+np.save(f"{demo}/data/hessian_progress_t_{target}_{method}", t)
+np.save(f"{demo}/data/hessian_progress_m_{target}_{method}", m)
+np.save(f"{demo}/data/hessian_progress_J_{target}_{method}", J)
+np.save(f"{demo}/data/hessian_progress_dJ_{target}_{method}", dJ)
+np.save(f"{demo}/data/hessian_progress_nc_{target}_{method}", nc)
 with open(f"{demo}/data/hessian_{target:.0f}_{method}.log", "w+") as f:
     note = " (FAIL)" if failed else ""
     f.write(f"cpu_time: {cpu_time}{note}\n")
