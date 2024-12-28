@@ -4,13 +4,6 @@ requires = ["setuptools"]
 [project]
 name = "opt_adapt"
 version = "0.2"
-dependencies = [
-  "netCDF4",
-  "pre-commit",
-  "pyproj",
-  "pytest",
-  "ruff",
-]
 authors = [
   {name = "Joseph G. Wallwork", email = "joe.wallwork@outlook.com"},
   {name = "Yihan Liu"},
@@ -25,6 +18,17 @@ license = {file = "LICENSE"}
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
+]
+dependencies = [
+  "netCDF4",
+  "pyproj",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pre-commit",
+  "pytest",
+  "ruff",
 ]
 
 [project.urls]
