@@ -71,7 +71,9 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
 
     # Setup boundary conditions
     P1v_2d = solver_obj.function_spaces.P1v_2d
-    u_in = Function(P1v_2d).interpolate(ufl.as_vector([5.0, 0.0]))
+    u_in = Function(P1v_2d)
+    u_in.dat.data[:, 0] = 5.0
+    u_in.dat.data[:, 1] = 0.0
     bcs = {
         1: {"uv": u_in},
         2: {"elev": Constant(0.0)},
@@ -93,39 +95,38 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     y2 = Constant(ym + sep)
     y3 = Constant(ym - sep)
     yc = Function(R).assign(control or 250.0)
-    Ct = 0.8
-    D = 18.0
-    At = D**2
+    thrust_coefficient = 0.8
+    turbine_diameter = 18.0
+    At = turbine_diameter**2
 
-    def bump(x0, y0, scale=1.0):
-        r = 18.0 / 2
+    def bump(x0, y0, label):
+        r = turbine_diameter / 2
         qx = ((x - x0) / r) ** 2
         qy = ((y - y0) / r) ** 2
         cond = ufl.And(qx < 1, qy < 1)
         b = ufl.exp(1 - 1 / (1 - qx)) * ufl.exp(1 - 1 / (1 - qy))
-        return ufl.conditional(cond, Constant(scale) * b, 0)
+        cond = ufl.conditional(cond, Constant(1.0) * b, 0)
+        integral = assemble(cond * ufl.dx)
+        assert integral > 0.0, f"Invalid area for {label}"
+        return cond / integral
 
-    b1 = assemble(bump(x1, y1) * ufl.dx)
-    b2 = assemble(bump(x2, y2) * ufl.dx)
-    b3 = assemble(bump(x3, y3) * ufl.dx)
-    bc = assemble(bump(xc, yc) * ufl.dx)
-    assert b1 > 0.0, f"Invalid area for turbine 1: {b1}"
-    assert b2 > 0.0, f"Invalid area for turbine 2: {b2}"
-    assert b3 > 0.0, f"Invalid area for turbine 3: {b3}"
-    assert bc > 0.0, f"Invalid area for control turbine: {bc}"
-    bumps = (
-        bump(x1, y1, scale=1 / b1)
-        + bump(x2, y2, scale=1 / b2)
-        + bump(x3, y3, scale=1 / b3)
-        + bump(xc, yc, scale=1 / bc)
+    turbine_density = (
+        bump(x1, y1, "turbine 1")
+        + bump(x2, y2, "turbine 2")
+        + bump(x3, y3, "turbine 3")
+        + bump(xc, yc, "control turbine")
+    )
+
+    # Apply thrust correction
+    thrust_coefficient *= 4.0 / (
+        1.0 + ufl.sqrt(1.0 - thrust_coefficient * At / (H * turbine_diameter))
     )
 
     # Setup tidal farm
-    Ct = Ct * 4.0 / (1.0 + ufl.sqrt(1.0 - Ct * At / (H * D)))  # thrust correction
     farm_options = TidalTurbineFarmOptions()
-    farm_options.turbine_density = bumps
-    farm_options.turbine_options.diameter = 18.0
-    farm_options.turbine_options.thrust_coefficient = Ct
+    farm_options.turbine_density = turbine_density
+    farm_options.turbine_options.diameter = turbine_diameter
+    farm_options.turbine_options.thrust_coefficient = thrust_coefficient
     options.tidal_turbine_farms = {"everywhere": [farm_options]}
     rho = Constant(1030.0)
 
@@ -138,7 +139,14 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
 
     # Define objective function
     u, eta = ufl.split(solver_obj.fields.solution_2d)
-    coeff = -rho * 0.5 * Ct * (ufl.pi * D / 2) ** 2 / At * bumps
+    coeff = (
+        -rho
+        * 0.5
+        * thrust_coefficient
+        * (ufl.pi * turbine_diameter / 2) ** 2
+        / At
+        * turbine_density
+    )
     J_power = coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
     # NOTE: negative because we want maximum
 
@@ -189,3 +197,12 @@ def hessian(mesh, **kwargs):
     metric = hessian_component(uv[0])
     metric.intersect(hessian_component(uv[1]), hessian_component(eta))
     return metric
+
+
+if __name__ == "__main__":
+    from firedrake.output.vtk_output import VTKFile
+
+    resolution = 4
+    init_mesh = initial_mesh(n=resolution)
+    init_control = initial_control(init_mesh)
+    forward_run(init_mesh, init_control, outfile=VTKFile("test.pvd"))

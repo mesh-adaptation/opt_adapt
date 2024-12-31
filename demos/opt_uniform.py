@@ -45,7 +45,7 @@ params = OptAdaptParameters(
         "dtol": args.dtol,
         "gtol": args.gtol,
         "model_options": {
-            "no_exports": True,
+            "no_exports": not args.debug,
             "outfile": VTKFile(
                 f"{demo}/outputs_uniform/{method}/solution.pvd", adaptive=True
             ),
