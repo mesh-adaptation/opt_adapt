@@ -97,7 +97,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     yc = Function(R).assign(control or 250.0)
     thrust_coefficient = 0.8
     turbine_diameter = 18.0
-    At = turbine_diameter**2
+    turbine_footprint = turbine_diameter**2
 
     def bump(x0, y0, label):
         r = turbine_diameter / 2
@@ -118,8 +118,9 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     )
 
     # Apply thrust correction
+    vertical_slice = H * turbine_diameter
     thrust_coefficient *= 4.0 / (
-        1.0 + ufl.sqrt(1.0 - thrust_coefficient * At / (H * turbine_diameter))
+        1.0 + ufl.sqrt(1.0 - thrust_coefficient * turbine_footprint / vertical_slice)
     )
 
     # Setup tidal farm
@@ -140,14 +141,9 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
 
     # Define objective function
     u, eta = ufl.split(solver_obj.fields.solution_2d)
-    coeff = (
-        -rho
-        * 0.5
-        * thrust_coefficient
-        * (ufl.pi * turbine_diameter / 2) ** 2
-        / At
-        * turbine_density
-    )
+    swiped_area = (ufl.pi * turbine_diameter / 2) ** 2
+    area_frac = swiped_area / turbine_footprint
+    coeff = -rho * 0.5 * thrust_coefficient * area_frac * turbine_density
     J_power = coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
     # NOTE: negative because we want maximum
 
