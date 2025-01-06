@@ -67,7 +67,7 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     options.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
     options.use_grad_depth_viscosity_term = False
     options.update(model_options)
-    solver_obj.create_equations()
+    solver_obj.create_function_spaces()
 
     # Setup boundary conditions
     P1v_2d = solver_obj.function_spaces.P1v_2d
@@ -127,7 +127,8 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     farm_options.turbine_density = turbine_density
     farm_options.turbine_options.diameter = turbine_diameter
     farm_options.turbine_options.thrust_coefficient = thrust_coefficient
-    options.tidal_turbine_farms = {"everywhere": [farm_options]}
+    options.tidal_turbine_farms["everywhere"] = [farm_options]
+    solver_obj.create_equations()
     rho = Constant(1030.0)
 
     # Apply initial conditions and solve
