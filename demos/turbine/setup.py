@@ -143,13 +143,13 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     u, eta = ufl.split(solver_obj.fields.solution_2d)
     swiped_area = (ufl.pi * turbine_diameter / 2) ** 2
     area_frac = swiped_area / turbine_footprint
-    coeff = -rho * 0.5 * thrust_coefficient * area_frac * turbine_density
-    J_power = coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
+    coeff = rho * 0.5 * thrust_coefficient * area_frac * turbine_density
+    J_power = -coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
     # NOTE: negative because we want maximum
 
     # Add a regularisation term for constraining the control
     area = assemble(Constant(1.0) * ufl.dx(domain=mesh))
-    alpha = 1.0 / area
+    alpha = Constant(1.0 / area)
     J_reg = (
         alpha
         * ufl.conditional(
