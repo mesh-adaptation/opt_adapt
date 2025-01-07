@@ -51,7 +51,7 @@ params = OptAdaptParameters(
         "target_inc": 0.1 * target,
         "target_max": target,
         "model_options": {
-            "no_exports": True,
+            "no_exports": not args.debug,
             "outfile": VTKFile(
                 f"{demo}/outputs_hessian/{method}/solution.pvd", adaptive=True
             ),
