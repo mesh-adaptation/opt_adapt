@@ -1,5 +1,11 @@
 all: uniform hessian go plot_qoi
 
+.PHONY: test
+
+test:
+	cd .. && \
+	python3 opt_uniform.py turbine --n 2 --debug
+
 uniform:
 	cd .. && \
 	for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do \
