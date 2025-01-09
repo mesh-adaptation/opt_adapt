@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import ufl
 from animate.metric import RiemannianMetric
+from firedrake.adjoint import pyadjoint
 from firedrake.assemble import assemble
 from firedrake.constant import Constant
 from firedrake.function import Function
@@ -27,13 +28,15 @@ def initial_control(mesh):
     return Function(R).assign(250.0)
 
 
-def forward_run(mesh, control=None, outfile=None, **model_options):
+def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     """
     Solve the shallow water flow-past-a-turbine problem on a given mesh.
 
     Optionally, pass an initial value for the control variable
     (y-coordinate of the centre of the second turbine).
     """
+    if debug:
+        pyadjoint.continue_annotation()
     x, y = ufl.SpatialCoordinate(mesh)
 
     # Setup bathymetry
@@ -159,6 +162,17 @@ def forward_run(mesh, control=None, outfile=None, **model_options):
     )
 
     J = assemble(J_power + J_reg, ad_block_tag="qoi")
+
+    if debug:
+        controls = {"q_2d": solver_obj.fields.solution_2d}
+        for key, control in controls.items():
+            Jhat = pyadjoint.ReducedFunctional(J, pyadjoint.Control(control))
+            h = Function(control)
+            h.assign(0.1)
+            assert pyadjoint.taylor_test(Jhat, control, h) > 1.9
+            print(f"Taylor test for {key} passed")
+        pyadjoint.pause_annotation()
+
     return J, yc
 
 
@@ -202,4 +216,4 @@ if __name__ == "__main__":
     resolution = 4
     init_mesh = initial_mesh(n=resolution)
     init_control = initial_control(init_mesh)
-    forward_run(init_mesh, init_control, outfile=VTKFile("test.pvd"))
+    forward_run(init_mesh, init_control, outfile=VTKFile("test.pvd"), debug=True)
