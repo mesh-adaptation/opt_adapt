@@ -25,7 +25,7 @@ def initial_mesh(n=4):
 
 def initial_control(mesh):
     R = FunctionSpace(mesh, "R", 0)
-    return Function(R).assign(250.0)
+    return Function(R, val=250.0)
 
 
 def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
@@ -90,14 +90,14 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     R = FunctionSpace(mesh, "R", 0)
     ym = 250.0
     sep = 60.0
-    x1 = Constant(456.0)
-    x2 = Constant(456.0)
-    x3 = Constant(456.0)
-    xc = Constant(744.0)
-    y1 = Constant(ym)
-    y2 = Constant(ym + sep)
-    y3 = Constant(ym - sep)
-    yc = Function(R).assign(control or 250.0)
+    x1 = Function(R, val=456.0)
+    x2 = Function(R, val=456.0)
+    x3 = Function(R, val=456.0)
+    xc = Function(R, val=744.0)
+    y1 = Function(R, val=ym)
+    y2 = Function(R, val=ym + sep)
+    y3 = Function(R, val=ym - sep)
+    yc = Function(R, val=control or 250.0)
     thrust_coefficient = 0.8
     turbine_diameter = 18.0
     turbine_footprint = turbine_diameter**2
