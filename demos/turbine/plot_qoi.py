@@ -4,109 +4,60 @@ import matplotlib.pyplot as plt
 import numpy as np
 from thetis import create_directory
 
+create_directory("plots")
 
-def plot_progress(axes, method, ext, gradients=True, **kwargs):
-    """
-    Plot the progress of an optimisation run, in terms
-    of control value vs. objective functional value.
-
-    :arg axes: the figure axes to plot on
-    :arg method: the optimisation method
-    :kwargs: to be passed to matplotlib's plotting functions
-    """
-    m = np.load(f"data/{method}_progress_m_{ext}.npy")[-1]
-    off = np.abs(m - 250.0)
-    J = -np.load(f"data/{method}_progress_J_{ext}.npy")[-1] / 1000.0
-    axes.plot(off, J, "x", **kwargs)
-
-
-labels = {
-    "uniform": "Uniform meshing",
-    "hessian": "Hessian-based",
-    # "go": "Goal-based",
+data_dict = {
+    "uniform": {
+        "label": "Uniform meshing",
+    },
+    "hessian": {
+        "label": "Hessian-based",
+    },
+    # "go": {
+    #     "label": "Goal-oriented",
+    # },
 }
 
-# Plot QoI vs #elements
-fig, axes = plt.subplots(figsize=(5, 3))
-for method, label in labels.items():
-    nc = []
-    J = []
+# Load data from files
+variables = ("nc", "J", "t", "m")
+for method, data in data_dict.items():
+    for variable in variables:
+        data[variable] = []
     for fname in glob.glob(f"data/{method}_*.log"):
         ext = "_".join(fname.split("_")[1:])[:-4]
-        try:
-            nc.append(np.load(f"data/{method}_progress_nc_{ext}.npy")[-1])
-            J.append(-np.load(f"data/{method}_progress_J_{ext}.npy")[-1] / 1000.0)
-        except (FileNotFoundError, IndexError):
-            continue
-    axes.semilogx(nc, J, "x", label=label)
-axes.set_xlabel("Number of mesh elements")
-axes.set_ylabel(r"Power output ($\mathrm{kW}$)")
-axes.grid(True, which="both")
-axes.legend()
-plt.tight_layout()
-create_directory("plots")
-plt.savefig("plots/converged_qoi_vs_elements.pdf")
-plt.savefig("plots/converged_qoi_vs_elements.jpg")
+        for variable in variables:
+            try:
+                value = np.load(f"data/{method}_progress_{variable}_{ext}.npy")[-1]
+            except (FileNotFoundError, IndexError):
+                continue
+            if variable == "J":
+                data[variable].append(-value / 1000)
+            else:
+                data[variable].append(value)
 
-# Plot QoI vs CPU time
-fig, axes = plt.subplots(figsize=(5, 3))
-for method, label in labels.items():
-    cpu = []
-    J = []
-    for fname in glob.glob(f"data/{method}_*.log"):
-        ext = "_".join(fname.split("_")[1:])[:-4]
-        try:
-            cpu.append(np.load(f"data/{method}_progress_t_{ext}.npy")[-1])
-            J.append(-np.load(f"data/{method}_progress_J_{ext}.npy")[-1] / 1000.0)
-        except (FileNotFoundError, IndexError):
-            continue
-    axes.semilogx(cpu, J, "x", label=label)
-axes.set_xlabel(r"CPU time ($\mathrm{s}$)")
-axes.set_ylabel(r"Power output ($\mathrm{kW}$)")
-axes.grid(True, which="both")
-axes.legend()
-plt.tight_layout()
-plt.savefig("plots/converged_qoi_vs_time.pdf")
-plt.savefig("plots/converged_qoi_vs_time.jpg")
+metadata = {
+    "J": {"label": "qoi", "name": r"Power output ($\mathrm{kW}$)"},
+    "nc": {"label": "elements", "name": "Number of mesh elements"},
+    "t": {"label": "time", "name": r"CPU time ($\mathrm{s}$)"},
+    "m": {"label": "control", "name": r"Control ($\mathrm{m}$)"},
+}
 
-# Plot control vs #elements
-fig, axes = plt.subplots(figsize=(5, 3))
-for method, label in labels.items():
-    nc = []
-    m = []
-    for fname in glob.glob(f"data/{method}_*.log"):
-        ext = "_".join(fname.split("_")[1:])[:-4]
-        try:
-            nc.append(np.load(f"data/{method}_progress_nc_{ext}.npy")[-1])
-            m.append(np.load(f"data/{method}_progress_m_{ext}.npy")[-1])
-        except (FileNotFoundError, IndexError):
-            continue
-    axes.semilogx(nc, m, "x", label=label)
-axes.set_xlabel("Number of mesh elements")
-axes.set_ylabel(r"Control ($\mathrm{m}$)")
-axes.grid(True, which="both")
-axes.legend()
-plt.tight_layout()
-plt.savefig("plots/converged_control_vs_elements.pdf")
-plt.savefig("plots/converged_control_vs_elements.jpg")
 
-# Plot QoI vs CPU time
-fig, axes = plt.subplots(figsize=(5, 3))
-for method, label in labels.items():
-    cpu = []
-    m = []
-    for fname in glob.glob(f"data/{method}_*.log"):
-        ext = "_".join(fname.split("_")[1:])[:-4]
-        try:
-            cpu.append(np.load(f"data/{method}_progress_t_{ext}.npy")[-1])
-            m.append(np.load(f"data/{method}_progress_m_{ext}.npy")[-1])
-        except (FileNotFoundError, IndexError):
-            continue
-    axes.semilogx(cpu, m, "x", label=label)
-axes.set_xlabel(r"CPU time ($\mathrm{s}$)")
-axes.set_ylabel(r"Control ($\mathrm{m}$)")
-axes.grid(True, which="both")
-axes.legend()
-plt.tight_layout()
-plt.savefig("plots/converged_control_vs_time.pdf")
-plt.savefig("plots/converged_control_vs_time.jpg")
+def plot(v1, v2):
+    fig, axes = plt.subplots(figsize=(5, 3))
+    for data in data_dict.values():
+        axes.semilogx(data[v1], data[v2], "x", label=data["label"])
+    axes.set_xlabel(metadata[v1]["name"])
+    axes.set_ylabel(metadata[v2]["name"])
+    axes.grid(True, which="both")
+    axes.legend()
+    plt.tight_layout()
+    fname = f"converged_{metadata[v2]['label']}_vs_{metadata[v1]['label']}"
+    for ext in ("pdf", "jpg"):
+        plt.savefig(f"plots/{fname}.{ext}")
+
+
+plot("nc", "J")
+plot("t", "J")
+plot("nc", "m")
+plot("t", "m")
