@@ -15,7 +15,7 @@ uniform:
 hessian:
 	cd .. && \
 	for target in 1000 2000 3000 4000 5000 6000 7000 8000 9000 10000; do \
-		python3 opt_hessian.py turbine --n 2 --target $$target --debug; \
+		python3 opt_hessian.py turbine --n 2 --target $$target; \
 	done
 
 go:
