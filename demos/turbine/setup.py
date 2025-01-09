@@ -113,7 +113,9 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
         assert integral > 0.0, f"Invalid area for {label}"
         return cond / integral
 
-    turbine_density = (
+    P1DG_2d = solver_obj.function_spaces.P1DG_2d
+    turbine_density = Function(P1DG_2d)
+    turbine_density.project(
         bump(x1, y1, "turbine 1")
         + bump(x2, y2, "turbine 2")
         + bump(x3, y3, "turbine 3")
