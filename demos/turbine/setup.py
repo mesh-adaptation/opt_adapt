@@ -75,8 +75,7 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     # Setup boundary conditions
     P1v_2d = solver_obj.function_spaces.P1v_2d
     u_in = Function(P1v_2d)
-    u_in.dat.data[:, 0] = 5.0
-    u_in.dat.data[:, 1] = 0.0
+    u_in.interpolate(ufl.as_vector([5.0, 0.0]))
     bcs = {
         1: {"uv": u_in},
         2: {"elev": Constant(0.0)},
