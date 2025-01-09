@@ -106,9 +106,11 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
         r = turbine_diameter / 2
         qx = ((x - x0) / r) ** 2
         qy = ((y - y0) / r) ** 2
-        cond = ufl.And(qx < 1, qy < 1)
-        b = ufl.exp(1 - 1 / (1 - qx)) * ufl.exp(1 - 1 / (1 - qy))
-        cond = ufl.conditional(cond, Constant(1.0) * b, 0)
+        cond = ufl.conditional(
+            ufl.And(qx < 1, qy < 1),
+            ufl.exp(1 - 1 / (1 - qx)) * ufl.exp(1 - 1 / (1 - qy)),
+            0,
+        )
         integral = assemble(cond * ufl.dx)
         assert integral > 0.0, f"Invalid area for {label}"
         return cond / integral
