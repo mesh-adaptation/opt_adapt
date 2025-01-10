@@ -26,9 +26,11 @@ for method, data in data_dict.items():
     for fname in glob.glob(f"data/{method}_*.log"):
         ext = "_".join(fname.split("_")[1:])[:-4]
         for variable in variables:
+            fname = f"data/{method}_progress_{variable}_{ext}.npy"
             try:
-                value = np.load(f"data/{method}_progress_{variable}_{ext}.npy")[-1]
+                value = np.load(fname)[-1]
             except (FileNotFoundError, IndexError):
+                print(f"Can't load {fname}")
                 continue
             if variable == "J":
                 data[variable].append(-value / 1000)
