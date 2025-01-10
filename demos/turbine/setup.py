@@ -149,8 +149,7 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     swiped_area = (ufl.pi * turbine_diameter / 2) ** 2
     area_frac = swiped_area / turbine_footprint
     coeff = rho * 0.5 * thrust_coefficient * area_frac * turbine_density
-    J_power = -coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
-    # NOTE: negative because we want maximum
+    J_power = coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
 
     # Add a regularisation term for constraining the control
     area = assemble(domain_constant(1.0, mesh) * ufl.dx)
@@ -163,7 +162,9 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
         * ufl.dx
     )
 
-    J = assemble(J_power + J_reg, ad_block_tag="qoi")
+    # Sum the two components
+    # NOTE: Scaling should be negative because we want maximum
+    J = assemble(-(J_power + J_reg), ad_block_tag="qoi")
 
     if debug:
         controls = {"q_2d": solver_obj.fields.solution_2d}
