@@ -35,8 +35,6 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     Optionally, pass an initial value for the control variable
     (y-coordinate of the centre of the second turbine).
     """
-    if debug:
-        pyadjoint.continue_annotation()
     x, y = ufl.SpatialCoordinate(mesh)
 
     # Setup bathymetry
@@ -175,7 +173,6 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
             h.assign(0.1)
             assert pyadjoint.taylor_test(Jhat, control, h) > 1.9
             print(f"Taylor test for {key} passed")
-        pyadjoint.pause_annotation()
 
     return J, yc
 
@@ -217,7 +214,9 @@ def hessian(mesh, **kwargs):
 if __name__ == "__main__":
     from firedrake.output.vtk_output import VTKFile
 
+    pyadjoint.continue_annotation()
     resolution = 4
     init_mesh = initial_mesh(n=resolution)
     init_control = initial_control(init_mesh)
     forward_run(init_mesh, init_control, outfile=VTKFile("test.pvd"), debug=True)
+    pyadjoint.pause_annotation()
