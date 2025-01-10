@@ -11,7 +11,7 @@ from firedrake.functionspace import FunctionSpace, TensorFunctionSpace
 from firedrake.utility_meshes import RectangleMesh
 from thetis.options import TidalTurbineFarmOptions
 from thetis.solver2d import FlowSolver2d
-from thetis.utility import get_functionspace
+from thetis.utility import domain_constant, get_functionspace
 
 from opt_adapt.opt import get_state
 
@@ -155,8 +155,8 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     # NOTE: negative because we want maximum
 
     # Add a regularisation term for constraining the control
-    area = assemble(Constant(1.0) * ufl.dx(domain=mesh))
-    alpha = Constant(1.0 / area)
+    area = assemble(domain_constant(1.0, mesh) * ufl.dx)
+    alpha = domain_constant(1.0 / area, mesh)
     J_reg = (
         alpha
         * ufl.conditional(
