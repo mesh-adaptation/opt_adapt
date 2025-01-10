@@ -96,7 +96,8 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     y1 = Function(R, val=ym)
     y2 = Function(R, val=ym + sep)
     y3 = Function(R, val=ym - sep)
-    yc = Function(R, val=control or 250.0)
+    yc = Function(R)
+    yc.assign(control or 250.0)
     thrust_coefficient = 0.8
     turbine_diameter = 18.0
     turbine_footprint = turbine_diameter**2
