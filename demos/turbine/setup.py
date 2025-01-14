@@ -12,7 +12,7 @@ from firedrake.utility_meshes import RectangleMesh
 from thetis.options import DiscreteTidalTurbineFarmOptions
 from thetis.solver2d import FlowSolver2d
 from thetis.turbines import TurbineFunctionalCallback
-from thetis.utility import domain_constant, get_functionspace
+from thetis.utility import domain_constant
 
 from opt_adapt.opt import get_state
 
@@ -37,93 +37,65 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     """
     x, y = ufl.SpatialCoordinate(mesh)
 
-    # Setup bathymetry
+    # Specify bathymetry
     channel_depth = 40.0
-    P1_2d = get_functionspace(mesh, "CG", 1)
-    bathymetry = Function(P1_2d)
-    bathymetry.assign(channel_depth)
 
     # Setup solver
-    solver_obj = FlowSolver2d(mesh, bathymetry)
+    solver_obj = FlowSolver2d(mesh, Constant(channel_depth))
     options = solver_obj.options
-    options.element_family = "dg-cg"
-    options.timestep = 20.0
-    options.simulation_export_time = 20.0
-    options.simulation_end_time = 18.0
+    options.element_family = "dg-dg"
+    options.timestep = 1.0
+    options.simulation_export_time = 1.0
+    options.simulation_end_time = 0.5
     options.swe_timestepper_type = "SteadyState"
     options.swe_timestepper_options.solver_parameters = {
-        "mat_type": "aij",
-        "snes_type": "newtonls",
-        "snes_linesearch_type": "bt",
-        "snes_rtol": 1.0e-08,
-        "snes_max_it": 100,
-        "ksp_type": "preonly",
-        "pc_type": "lu",
-        "pc_factor_mat_solver_type": "mumps",
+        "snes_rtol": 1.0e-12,
     }
-    options.use_grad_div_viscosity_term = False
+    # options.use_grad_div_viscosity_term = False
     options.horizontal_viscosity = Constant(0.5)
     options.quadratic_drag_coefficient = Constant(0.0025)
-    options.use_lax_friedrichs_velocity = True
-    options.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
-    options.use_grad_depth_viscosity_term = False
+    # options.use_grad_depth_viscosity_term = False
     options.update(model_options)
-    solver_obj.create_function_spaces()
 
     # Setup boundary conditions
-    u_in = Function(solver_obj.function_spaces.P1v_2d)
-    u_in.interpolate(ufl.as_vector([5.0, 0.0]))
     solver_obj.bnd_functions["shallow_water"] = {
-        1: {"uv": u_in},
+        1: {"uv": Constant((3.0, 0.0))},
         2: {"elev": Constant(0.0)},
         3: {"un": Constant(0.0)},
         4: {"un": Constant(0.0)},
     }
-
-    # Define turbine parameters
-    R = FunctionSpace(mesh, "R", 0)
-    ym = 250.0
-    sep = 60.0
-    x1 = Function(R, val=456.0)
-    x2 = Function(R, val=456.0)
-    x3 = Function(R, val=456.0)
-    xc = Function(R, val=744.0)
-    y1 = Function(R, val=ym)
-    y2 = Function(R, val=ym + sep)
-    y3 = Function(R, val=ym - sep)
-    yc = Function(R, name="The control variable")
-    yc.assign(control or 250.0)
-    thrust_coefficient = 0.8
-    turbine_diameter = 18.0
+    solver_obj.create_function_spaces()
 
     # Setup tidal farm
     farm_options = DiscreteTidalTurbineFarmOptions()
     turbine_density = Function(solver_obj.function_spaces.P1_2d).assign(1.0)
     farm_options.turbine_type = "constant"
     farm_options.turbine_density = turbine_density
-    farm_options.turbine_options.diameter = turbine_diameter
-    farm_options.turbine_options.thrust_coefficient = thrust_coefficient
-    farm_options.upwind_correction = (
-        True  # See https://arxiv.org/abs/1506.03611 for more details
-    )
-    farm_options.turbine_coordinates = [(x1, y1), (x2, y2), (x3, y3), (xc, yc)]
-    site_ID = "everywhere"
-    options.discrete_tidal_turbine_farms[site_ID] = [farm_options]
+    farm_options.turbine_options.diameter = 18.0
+    farm_options.turbine_options.thrust_coefficient = 0.8
+    farm_options.quadrature_degree = 100
+    farm_options.upwind_correction = False
+    farm_options.turbine_coordinates = [
+        [domain_constant(x, mesh=mesh), domain_constant(y, mesh=mesh)]
+        for x, y in [[456, 250], [456, 310], [456, 190], [744, 260]]
+    ]
+    y2 = farm_options.turbine_coordinates[1][1]
+    y3 = farm_options.turbine_coordinates[2][1]
+    yc = farm_options.turbine_coordinates[3][1]
+    options.discrete_tidal_turbine_farms["everywhere"] = [farm_options]
 
     # Add a callback for computing the power output
     cb = TurbineFunctionalCallback(solver_obj)
     solver_obj.add_callback(cb, "timestep")
 
     # Apply initial conditions and solve
-    solver_obj.assign_initial_conditions(uv=u_in)
+    solver_obj.assign_initial_conditions(uv=(ufl.as_vector((1.0e-03, 0.0))))
     solver_obj.iterate()
     if outfile is not None:
         u, eta = solver_obj.fields.solution_2d.subfunctions
         outfile.write(u, eta)
 
-    # Set the control variable
-    control_variable = yc
-    J_power = cb.instantaneous_power[0]
+    J_power = sum(cb.integrated_power)
 
     # Add a regularisation term for constraining the control
     area = assemble(domain_constant(1.0, mesh) * ufl.dx)
@@ -140,9 +112,10 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     # NOTE: We rescale the functional such that the gradients are ~ order magnitude 1
     # NOTE: We also multiply by -1 so that if we minimise the functional, we maximise
     #       power (maximize is also available from pyadjoint but currently broken)
-    scaling = -10000.0
+    scaling = -10000
     J = scaling * (J_power + assemble(J_reg))
 
+    control_variable = yc
     if debug:
         # Perform a Taylor test
         Jhat = pyadjoint.ReducedFunctional(J, pyadjoint.Control(control_variable))
