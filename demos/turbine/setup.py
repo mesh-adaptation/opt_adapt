@@ -7,7 +7,7 @@ from firedrake.adjoint import pyadjoint
 from firedrake.assemble import assemble
 from firedrake.constant import Constant
 from firedrake.function import Function
-from firedrake.functionspace import FunctionSpace, TensorFunctionSpace
+from firedrake.functionspace import TensorFunctionSpace
 from firedrake.utility_meshes import RectangleMesh
 from thetis.options import DiscreteTidalTurbineFarmOptions
 from thetis.solver2d import FlowSolver2d
@@ -25,7 +25,7 @@ def initial_mesh(n=4):
 
 
 def initial_control(mesh):
-    return Function(FunctionSpace(mesh, "R", 0)).assign(250.0)
+    return domain_constant(260.0, mesh)
 
 
 def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
@@ -77,7 +77,7 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     farm_options.upwind_correction = False
     farm_options.turbine_coordinates = [
         [domain_constant(x, mesh=mesh), domain_constant(y, mesh=mesh)]
-        for x, y in [[456, 250], [456, 310], [456, 190], [744, 260]]
+        for x, y in [[456, 250], [456, 310], [456, 190], [744, control or 250]]
     ]
     y2 = farm_options.turbine_coordinates[1][1]
     y3 = farm_options.turbine_coordinates[2][1]
