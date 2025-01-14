@@ -9,8 +9,9 @@ from firedrake.constant import Constant
 from firedrake.function import Function
 from firedrake.functionspace import FunctionSpace, TensorFunctionSpace
 from firedrake.utility_meshes import RectangleMesh
-from thetis.options import TidalTurbineFarmOptions
+from thetis.options import DiscreteTidalTurbineFarmOptions
 from thetis.solver2d import FlowSolver2d
+from thetis.turbines import TurbineFunctionalCallback
 from thetis.utility import domain_constant, get_functionspace
 
 from opt_adapt.opt import get_state
@@ -24,8 +25,7 @@ def initial_mesh(n=4):
 
 
 def initial_control(mesh):
-    R = FunctionSpace(mesh, "R", 0)
-    return Function(R, val=250.0)
+    return Function(FunctionSpace(mesh, "R", 0)).assign(250.0)
 
 
 def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
@@ -38,10 +38,10 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     x, y = ufl.SpatialCoordinate(mesh)
 
     # Setup bathymetry
-    H = 40.0
+    channel_depth = 40.0
     P1_2d = get_functionspace(mesh, "CG", 1)
     bathymetry = Function(P1_2d)
-    bathymetry.assign(H)
+    bathymetry.assign(channel_depth)
 
     # Setup solver
     solver_obj = FlowSolver2d(mesh, bathymetry)
@@ -71,17 +71,14 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     solver_obj.create_function_spaces()
 
     # Setup boundary conditions
-    P1v_2d = solver_obj.function_spaces.P1v_2d
-    u_in = Function(P1v_2d)
+    u_in = Function(solver_obj.function_spaces.P1v_2d)
     u_in.interpolate(ufl.as_vector([5.0, 0.0]))
-    bcs = {
+    solver_obj.bnd_functions["shallow_water"] = {
         1: {"uv": u_in},
         2: {"elev": Constant(0.0)},
         3: {"un": Constant(0.0)},
+        4: {"un": Constant(0.0)},
     }
-    if 4 in mesh.exterior_facets.unique_markers:
-        bcs[4] = {"un": Constant(0.0)}
-    solver_obj.bnd_functions["shallow_water"] = bcs
 
     # Define turbine parameters
     R = FunctionSpace(mesh, "R", 0)
@@ -94,48 +91,28 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     y1 = Function(R, val=ym)
     y2 = Function(R, val=ym + sep)
     y3 = Function(R, val=ym - sep)
-    yc = Function(R)
+    yc = Function(R, name="The control variable")
     yc.assign(control or 250.0)
     thrust_coefficient = 0.8
     turbine_diameter = 18.0
-    turbine_footprint = turbine_diameter**2
-
-    def bump(x0, y0, label):
-        r = turbine_diameter / 2
-        qx = ((x - x0) / r) ** 2
-        qy = ((y - y0) / r) ** 2
-        cond = ufl.conditional(
-            ufl.And(qx < 1, qy < 1),
-            ufl.exp(1 - 1 / (1 - qx)) * ufl.exp(1 - 1 / (1 - qy)),
-            0,
-        )
-        integral = assemble(cond * ufl.dx)
-        assert integral > 0.0, f"Invalid area for {label}"
-        return cond / integral
-
-    P1DG_2d = solver_obj.function_spaces.P1DG_2d
-    turbine_density = Function(P1DG_2d)
-    turbine_density.project(
-        bump(x1, y1, "turbine 1")
-        + bump(x2, y2, "turbine 2")
-        + bump(x3, y3, "turbine 3")
-        + bump(xc, yc, "control turbine")
-    )
-
-    # Apply thrust correction
-    vertical_slice = H * turbine_diameter
-    thrust_coefficient *= 4.0 / (
-        1.0 + ufl.sqrt(1.0 - thrust_coefficient * turbine_footprint / vertical_slice)
-    )
 
     # Setup tidal farm
-    farm_options = TidalTurbineFarmOptions()
+    farm_options = DiscreteTidalTurbineFarmOptions()
+    turbine_density = Function(solver_obj.function_spaces.P1_2d).assign(1.0)
+    farm_options.turbine_type = "constant"
     farm_options.turbine_density = turbine_density
     farm_options.turbine_options.diameter = turbine_diameter
     farm_options.turbine_options.thrust_coefficient = thrust_coefficient
-    options.tidal_turbine_farms["everywhere"] = [farm_options]
-    solver_obj.create_equations()
-    rho = Constant(1030.0)
+    farm_options.upwind_correction = (
+        True  # See https://arxiv.org/abs/1506.03611 for more details
+    )
+    farm_options.turbine_coordinates = [(x1, y1), (x2, y2), (x3, y3), (xc, yc)]
+    site_ID = "everywhere"
+    options.discrete_tidal_turbine_farms[site_ID] = [farm_options]
+
+    # Add a callback for computing the power output
+    cb = TurbineFunctionalCallback(solver_obj)
+    solver_obj.add_callback(cb, "timestep")
 
     # Apply initial conditions and solve
     solver_obj.assign_initial_conditions(uv=u_in)
@@ -144,12 +121,11 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
         u, eta = solver_obj.fields.solution_2d.subfunctions
         outfile.write(u, eta)
 
-    # Define objective function
-    u, eta = ufl.split(solver_obj.fields.solution_2d)
-    swiped_area = (ufl.pi * turbine_diameter / 2) ** 2
-    area_frac = swiped_area / turbine_footprint
-    coeff = rho * 0.5 * thrust_coefficient * area_frac * turbine_density
-    J_power = coeff * ufl.dot(u, u) ** 1.5 * ufl.dx
+    # TODO: Rescale the functional such that the gradients are ~ order magnitude 1
+    J_power = cb.instantaneous_power[0]
+
+    # Set the control variable
+    control_variable = yc
 
     # Add a regularisation term for constraining the control
     area = assemble(domain_constant(1.0, mesh) * ufl.dx)
@@ -163,19 +139,20 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     )
 
     # Sum the two components
-    # NOTE: Scaling should be negative because we want maximum
-    J = assemble(-(J_power + J_reg), ad_block_tag="qoi")
+    # NOTE: We multiply by -1 so that if we minimise the functional, we maximise power
+    # (maximize is also available from pyadjoint but currently broken)
+    J = -(J_power + assemble(J_reg))
 
     if debug:
-        controls = {"q_2d": solver_obj.fields.solution_2d}
-        for key, control in controls.items():
-            Jhat = pyadjoint.ReducedFunctional(J, pyadjoint.Control(control))
-            h = Function(control)
-            h.assign(0.1)
-            assert pyadjoint.taylor_test(Jhat, control, h) > 1.9
-            print(f"Taylor test for {key} passed")
+        # Perform a Taylor test
+        Jhat = pyadjoint.ReducedFunctional(J, pyadjoint.Control(control_variable))
+        h = Function(control_variable)
+        np.random.seed(23)
+        h.dat.data[:] = np.random.random(h.dat.data.shape)
+        assert pyadjoint.taylor_test(Jhat, control, h) > 1.95
+        print("Taylor test passed")
 
-    return J, yc
+    return J, control_variable
 
 
 def hessian(mesh, **kwargs):
