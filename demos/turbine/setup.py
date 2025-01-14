@@ -121,11 +121,9 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
         u, eta = solver_obj.fields.solution_2d.subfunctions
         outfile.write(u, eta)
 
-    # TODO: Rescale the functional such that the gradients are ~ order magnitude 1
-    J_power = cb.instantaneous_power[0]
-
     # Set the control variable
     control_variable = yc
+    J_power = cb.instantaneous_power[0]
 
     # Add a regularisation term for constraining the control
     area = assemble(domain_constant(1.0, mesh) * ufl.dx)
@@ -139,9 +137,11 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     )
 
     # Sum the two components
-    # NOTE: We multiply by -1 so that if we minimise the functional, we maximise power
-    # (maximize is also available from pyadjoint but currently broken)
-    J = -(J_power + assemble(J_reg))
+    # NOTE: We rescale the functional such that the gradients are ~ order magnitude 1
+    # NOTE: We also multiply by -1 so that if we minimise the functional, we maximise
+    #       power (maximize is also available from pyadjoint but currently broken)
+    scaling = -10000.0
+    J = scaling * (J_power + assemble(J_reg))
 
     if debug:
         # Perform a Taylor test
