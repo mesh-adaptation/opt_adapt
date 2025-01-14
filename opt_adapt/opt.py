@@ -1,4 +1,5 @@
 from time import perf_counter
+from warnings import warn
 
 import firedrake as fd
 import numpy as np
@@ -217,8 +218,12 @@ def _gradient_descent(it, forward_run, m, params, u, u_, dJ_):
         dJ_diff = fd.assemble(ufl.inner(dJ_ - dJ, dJ_ - dJ) * ufl.dx)
         lr = abs(fd.assemble(ufl.inner(u_ - u, dJ_ - dJ) * ufl.dx) / dJ_diff)
     lr = max(lr, params.lr_min)
-    if np.isnan(lr):
-        raise ValueError("NaN learning rate")
+    if np.isnan(lr) or lr <= 0.0:
+        warn(
+            "Barzilai-Borwein formula gave an invalid learning rate, using default",
+            stacklevel=1,
+        )
+        lr = params.lr
 
     # Take a step downhill
     u += lr * P
