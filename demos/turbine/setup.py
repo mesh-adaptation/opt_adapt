@@ -100,10 +100,10 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     # Add a regularisation term for constraining the control
     area = assemble(domain_constant(1.0, mesh) * ufl.dx)
     alpha = domain_constant(1.0 / area, mesh)
-    J_reg = (
+    J_reg = assemble(
         alpha
         * ufl.conditional(
-            yc < y2, (yc - y2) ** 2, ufl.conditional(yc > y3, (yc - y3) ** 2, 0)
+            yc < y3, (yc - y3) ** 2, ufl.conditional(yc > y2, (yc - y2) ** 2, 0)
         )
         * ufl.dx
     )
@@ -112,8 +112,10 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     # NOTE: We rescale the functional such that the gradients are ~ order magnitude 1
     # NOTE: We also multiply by -1 so that if we minimise the functional, we maximise
     #       power (maximize is also available from pyadjoint but currently broken)
-    scaling = -10000
-    J = scaling * (J_power + assemble(J_reg))
+    scaling = 10000
+    J = scaling * (-J_power + J_reg)
+
+    print(f"DEBUG power: {J_power:.4e}, reg: {J_reg:.4e}")
 
     control_variable = yc
     if debug:
