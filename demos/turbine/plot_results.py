@@ -1,4 +1,5 @@
 import glob
+from warnings import warn
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,7 +34,15 @@ for method, data in data_dict.items():
                 print(f"Can't load {fname}")
                 continue
             if variable == "J":
-                data[variable].append(-value / 1000)
+                descaled = -value / 10000
+                kw = descaled / 1000
+                if kw <= 0.0:
+                    warn(f"Negative power from {fname}", stacklevel=1)
+                    kw = np.nan
+                data[variable].append(kw)
+            elif variable == "m" and (value <= 0.0 or value >= 500.0):
+                warn(f"Control out of bounds from {fname}", stacklevel=1)
+                data[variable].append(np.nan)
             else:
                 data[variable].append(value)
 
