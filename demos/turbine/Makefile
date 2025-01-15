@@ -25,7 +25,7 @@ go:
 	done
 
 plot:
-	python3 plot_qoi.py
+	python3 plot_results.py
 
 clean:
 	rm *.log
