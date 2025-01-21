@@ -12,7 +12,7 @@ from firedrake.utility_meshes import RectangleMesh
 from thetis.options import DiscreteTidalTurbineFarmOptions
 from thetis.solver2d import FlowSolver2d
 from thetis.turbines import TurbineFunctionalCallback
-from thetis.utility import domain_constant
+from thetis.utility import domain_constant, get_functionspace
 
 from opt_adapt.opt import get_state
 
@@ -38,7 +38,15 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     x, y = ufl.SpatialCoordinate(mesh)
 
     # Specify bathymetry
-    channel_depth = 40.0
+    channel_depth = domain_constant(40.0, mesh)
+    channel_width = domain_constant(500.0, mesh)
+    bathymetry_scaling = domain_constant(2.0, mesh)
+    P1_2d = get_functionspace(mesh, "CG", 1)
+    y_prime = y - channel_width / 2
+    bathymetry = Function(P1_2d)
+    bathymetry.interpolate(
+        channel_depth - (bathymetry_scaling * y_prime / channel_width) ** 2
+    )
 
     # Setup solver
     solver_obj = FlowSolver2d(mesh, Constant(channel_depth))
