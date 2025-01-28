@@ -74,13 +74,75 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     }
     solver_obj.create_function_spaces()
 
+    # Define the thrust curve of the turbine using a tabulated approach:
+    # speeds_AR2000: speeds for corresponding thrust coefficients - thrusts_AR2000
+    # thrusts_AR2000: list of idealised thrust coefficients of an AR2000 tidal turbine
+    # using a curve fitting technique with:
+    #   * cut-in speed = 1 m/s
+    #   * rated speed = 3.05 m/s
+    #   * cut-out speed = 5 m/s
+    # (ramp up and down to cut-in and at cut-out speeds for model stability)
+    speeds_AR2000 = [
+        0.0,
+        0.75,
+        0.85,
+        0.95,
+        1.0,
+        3.05,
+        3.3,
+        3.55,
+        3.8,
+        4.05,
+        4.3,
+        4.55,
+        4.8,
+        5.0,
+        5.001,
+        5.05,
+        5.25,
+        5.5,
+        5.75,
+        6.0,
+        6.25,
+        6.5,
+        6.75,
+        7.0,
+    ]
+    thrusts_AR2000 = [
+        0.010531,
+        0.032281,
+        0.038951,
+        0.119951,
+        0.516484,
+        0.516484,
+        0.387856,
+        0.302601,
+        0.242037,
+        0.197252,
+        0.16319,
+        0.136716,
+        0.115775,
+        0.102048,
+        0.060513,
+        0.005112,
+        0.00151,
+        0.00089,
+        0.000653,
+        0.000524,
+        0.000442,
+        0.000384,
+        0.000341,
+        0.000308,
+    ]
+
     # Setup tidal farm
     farm_options = DiscreteTidalTurbineFarmOptions()
     turbine_density = Function(solver_obj.function_spaces.P1_2d).assign(1.0)
-    farm_options.turbine_type = "constant"
+    farm_options.turbine_type = "table"
     farm_options.turbine_density = turbine_density
     farm_options.turbine_options.diameter = 18.0
-    farm_options.turbine_options.thrust_coefficient = 0.8
+    farm_options.turbine_options.thrust_speeds = speeds_AR2000
+    farm_options.turbine_options.thrust_coefficients = thrusts_AR2000
     farm_options.quadrature_degree = 100
     farm_options.upwind_correction = False
     farm_options.turbine_coordinates = [
