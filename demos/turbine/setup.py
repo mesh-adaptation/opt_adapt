@@ -143,7 +143,6 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     farm_options.turbine_options.diameter = 18.0
     farm_options.turbine_options.thrust_speeds = speeds_AR2000
     farm_options.turbine_options.thrust_coefficients = thrusts_AR2000
-    farm_options.quadrature_degree = 100
     farm_options.upwind_correction = False
     farm_options.turbine_coordinates = [
         [domain_constant(x, mesh=mesh), domain_constant(y, mesh=mesh)]
@@ -184,8 +183,6 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     #       power (maximize is also available from pyadjoint but currently broken)
     scaling = 10000
     J = scaling * (-J_power + J_reg)
-
-    print(f"DEBUG power: {J_power:.4e}, reg: {J_reg:.4e}")
 
     control_variable = yc
     if debug:
