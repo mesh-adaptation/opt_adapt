@@ -82,6 +82,8 @@ def forward_run(mesh, control=None, outfile=None, debug=False, **model_options):
     #   * rated speed = 3.05 m/s
     #   * cut-out speed = 5 m/s
     # (ramp up and down to cut-in and at cut-out speeds for model stability)
+    # NOTE: Taken from Thetis:
+    #    https://github.com/thetisproject/thetis/blob/master/examples/discrete_turbines/tidal_array.py
     speeds_AR2000 = [
         0.0,
         0.75,
